@@ -16,6 +16,8 @@ from fastapi import FastAPI, Response, Request, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse
 api = FastAPI()
 
+dotenv.load_dotenv()
+
 @dataclass
 class UserVote:
     tickets: int
@@ -68,13 +70,15 @@ def read_root():
     response = RedirectResponse(
         url="https://accounts.spotify.com/authorize?" + urlencode(params)
     )
-    return response, state
+    response.set_cookie(key=os.environ.get("STATE_KEY"), value=state)
+    return response
 
 @api.get("/callback")
-def callback(request: Request, response: Response, stored_state: str):
+def callback(request: Request, response: Response):
 
     code = request.query_params["code"]
     state = request.query_params["state"]
+    stored_state = request.cookies.get(os.environ.get("STATE_KEY"))
 
     if state == None or state != stored_state:
         raise HTTPException(status_code=400, detail="State mismatch")
@@ -108,7 +112,7 @@ def callback(request: Request, response: Response, stored_state: str):
 
         return response
 
-@api.get("/refresh_token")
+@api.get("/refresh_token", response_class=HTMLResponse)
 def refresh_token(request: Request):
     refresh_token = request.query_params["refresh_token"]
     request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
@@ -129,7 +133,7 @@ def refresh_token(request: Request):
     else:
         data = response.json()
         access_token = data["access_token"]
-
+        
         return {"access_token": access_token}
 
 def generate_random_string(string_length):
