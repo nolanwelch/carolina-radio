@@ -154,7 +154,7 @@ def refresh_token(request: Request):
         access_token = data["access_token"]
         response = HTMLResponse()
         response.set_cookie(key="accessToken",value=access_token)
-        if data["refresh_token"]:
+        if "refresh_token" in data:
             response.set_cookie(key="refreshToken",value=data["refresh_token"])
         return response
 
@@ -192,25 +192,6 @@ def get_song_data(song_id: str):
 
     return data
 
-async def get_current_token(token: str = Depends(oauth2_scheme)):
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Access token is missing",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    # Optionally, add logic to verify or decode the token here
-    return token
-
-def get_song_duration(song_id: str, token: str = Depends(get_current_token)):
-    url = f"https://api.spotify.com/v1/audio-features/{song_id}"
-    req = requests.get(
-        url,
-    )
-    if req.status_code != 200:
-        return None
-    return int(req.json()["duration_ms"])
-
 
 @api.get("/search/")
 def get_songs(q: str):
@@ -242,39 +223,6 @@ def get_songs(q: str):
         )
         for t in tracks
     ]
-
-@api.post("/request/")
-def create_request(request: SongRequest):
-    songs_collection = db["songs"]
-    song_metadata = songs_collection.find_one({"spotifyId": request.songId})
-    if not song_metadata:
-        data = get_song_data(request.songId)
-        if data is None:
-            return None
-        song_data = Song(
-            request.songId,
-            data["durationMs"],
-            data["name"],
-            data["artists"],
-            data["album"]["name"],
-            data["album"]["images"][0]["url"],
-        )
-        # insert song data to songs collection
-        songs_collection.insert_one(song_data)
-    req_collection = db["requests"]
-    req_collection.insert_one(request)
-
-
-def get_song_data(song_id: str):
-    url = f"https://api.spotify.com/v1/tracks/{song_id}"
-    req = requests.get(url)
-    if req.status_code != 200:
-        return None
-    data = req.json()
-
-    data["durationMs"] = get_song_duration(song_id)
-
-    return data
 
 
 async def get_current_token(request: Request):
@@ -297,38 +245,6 @@ def get_song_duration(song_id: str, token: str = Depends(get_current_token)):
     if req.status_code != 200:
         return None
     return int(req.json()["duration_ms"])
-
-
-@api.get("/search/")
-def get_songs(q: str):
-    access_token = q.cookies.get("accessToken")
-
-    url = "https://api.spotify.com/v1/search/"
-    req = requests.get(
-        url,
-        params={
-            "q": q,
-            "type": "track",
-            "market": "US",
-        },
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    if req.status_code != 200:
-        raise HTTPException(req.status_code, req.reason)
-
-    tracks = req.json()["tracks"]["items"]
-
-    return [
-        Song(
-            t["id"],
-            get_song_duration(t["id"]),
-            t["name"],
-            t["artists"],
-            t["album"]["name"],
-            t["album"]["images"][0]["url"],
-        )
-        for t in tracks
-    ]
 
 
 def generate_random_string(string_length):
