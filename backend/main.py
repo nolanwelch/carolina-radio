@@ -270,7 +270,8 @@ def get_song_data(song_id: str):
     return data
 
 
-async def get_current_token(token: str = Depends(oauth2_scheme)):
+async def get_current_token(request: Request):
+    token = request.cookies.get("accessToken")
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
