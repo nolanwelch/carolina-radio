@@ -31,7 +31,7 @@ function AppTabs() {
   
   return (
     <>
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'blue' }}>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs variant="fullWidth" value={value} onChange={handleChange} aria-label="basic tabs example">
           <Tab label="Next Up"/>
           <Tab label="My Queue"/>
