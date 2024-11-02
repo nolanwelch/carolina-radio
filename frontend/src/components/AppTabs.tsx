@@ -1,11 +1,40 @@
 import { Box, Tab, Tabs } from '@mui/material';
 import { useState } from 'react';
+import Song from '../types/Song';
+import NextUp from './NextUp/NextUp';
 
 interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
   value: number;
 }
+
+const SAMPLE_SONGS: Song[] = [
+  {
+    title: "Example Song",
+    artist: "Example Artist", 
+    album: "Example Album",
+    coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
+    lengthMs: 210000,
+    requestCount: 15
+  },
+  {
+    title: "Epic Song",
+    artist: "Epic Artist", 
+    album: "Epic Album",
+    coverUrl: "/album-art-tmp.png",
+    lengthMs: 210000,
+    requestCount: 15
+  },
+  {
+    title: "Temp Song",
+    artist: "Temp Artist", 
+    album: "Temp Album",
+    coverUrl: "/album-art-tmp.png",
+    lengthMs: 210000,
+    requestCount: 15
+  }
+]
 
 function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
@@ -38,7 +67,7 @@ function AppTabs() {
         </Tabs>
       </Box>
       <TabPanel value={value} index={0}>
-        Next up component here
+        <NextUp songs={SAMPLE_SONGS}/>
       </TabPanel>
       <TabPanel value={value} index={1}>
         Queue component here
