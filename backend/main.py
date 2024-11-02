@@ -192,6 +192,15 @@ def get_song_data(song_id: str):
 
     return data
 
+async def get_current_token(token: str = Depends(oauth2_scheme)):
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Access token is missing",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    # Optionally, add logic to verify or decode the token here
+    return token
 
 def get_song_duration(song_id: str, token: str = Depends(get_current_token)):
     url = f"https://api.spotify.com/v1/audio-features/{song_id}"
@@ -233,8 +242,6 @@ def get_songs(q: str):
         )
         for t in tracks
     ]
-
-
 
 @api.post("/request/")
 def create_request(request: SongRequest):
