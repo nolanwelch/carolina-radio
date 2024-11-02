@@ -7,8 +7,6 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import pandas as pd
 
-# trigger build
-
 @dataclass
 class UserVote:
     tickets: int
