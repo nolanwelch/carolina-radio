@@ -2,13 +2,14 @@ import React from 'react';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import { CardMedia, Typography } from '@mui/material';
+import styles from "./SongPlaying.module.css";
 
 function SongPlaying() {
   return (
-    <Card sx={{ textAlign: "center", width: "fit-content" }}>
+    <Card className={styles.card}>
       <CardContent>
         <img src="/album-art-tmp.png"
-          style={{ height: "100%", width: 200, textAlign: "center" }}
+          className={styles.albumCover}
           alt="Album art"
         />
         <Typography variant="h6">Song Title</Typography>

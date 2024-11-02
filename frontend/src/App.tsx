@@ -1,7 +1,7 @@
 import { CssBaseline } from '@mui/material';
 import './App.css';
 import AppTabs from './components/AppTabs';
-import SongPlaying from './components/SongPlaying';
+import SongPlaying from './components/SongPlaying/SongPlaying';
 import { createTheme, ThemeOptions, ThemeProvider } from '@mui/material/styles';
 
 const theme = createTheme({
