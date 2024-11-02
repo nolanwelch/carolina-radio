@@ -12,6 +12,10 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import pandas as pd
 
+from fastapi import FastAPI, Response, Request, HTTPException
+from fastapi.responses import RedirectResponse, HTMLResponse
+api = FastAPI()
+
 @dataclass
 class UserVote:
     tickets: int
@@ -34,11 +38,7 @@ def choose_next_song(votes: UserVote):
     return str(song_uri)
 
 
-def main():
-    dotenv.load_dotenv()
-    client = get_db()
-    votes = [UserVote(1, "test"), UserVote(1, "test2"), UserVote(2, "test3")]
-    print(choose_next_song(votes))
+
 
 @api.get("/login")
 def read_root():
@@ -68,7 +68,7 @@ def callback(request: Request, response: Response, stored_state: str):
     else:
 
         url = "https://accounts.spotify.com/api/token"
-        request_string = CLIENT_ID + ":" + CLIENT_SECRET
+        request_string = os.environ.get("CLIENT_ID") + ":" + CLIENT_SECRET
         encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
         encoded_string = str(encoded_bytes, "utf-8")
         header = {
@@ -104,6 +104,12 @@ def generate_random_string(string_length):
         ]
     )
     return text
+
+def main():
+    dotenv.load_dotenv()
+    client = get_db()
+    votes = [UserVote(1, "test"), UserVote(1, "test2"), UserVote(2, "test3")]
+    print(choose_next_song(votes))
 
 if __name__ == "__main__":
     main()
