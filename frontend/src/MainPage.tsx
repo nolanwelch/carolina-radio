@@ -1,8 +1,9 @@
-import { CssBaseline, FormControl, FormControlLabel, FormLabel, Radio, RadioGroup } from '@mui/material';
+import { Box, Button, CssBaseline, FormControl, FormControlLabel, FormLabel, IconButton, Radio, RadioGroup } from '@mui/material';
 import './App.css';
 import AppTabs from './components/AppTabs';
 import { createTheme, ThemeProvider, useColorScheme } from '@mui/material/styles';
 import SongPlaying from './components/SongPlaying/SongPlaying';
+import { DarkMode, LightMode } from '@mui/icons-material';
 
 export default function MainPage() {
   const { mode, setMode, systemMode } = useColorScheme();
@@ -14,23 +15,15 @@ export default function MainPage() {
   return (
     <>
       <CssBaseline />
-      <FormControl>
-        <FormLabel id="demo-theme-toggle">Theme</FormLabel>
-        <RadioGroup
-          aria-labelledby="demo-theme-toggle"
-          name="theme-toggle"
-          row
-          value={mode ?? "dark"}
-          onChange={(event) => {
-            setMode(event.target.value as 'light' | 'dark' | 'system')
-          }
-          }
-        >
-          <FormControlLabel value="system" control={<Radio />} label="System" />
-          <FormControlLabel value="light" control={<Radio />} label="Light" />
-          <FormControlLabel value="dark" control={<Radio />} label="Dark" />
-        </RadioGroup>
-      </FormControl>
+      <Box sx={{ position: "fixed", top: 12, right: 12 }}>
+        {mode === "light" ?
+        <IconButton onClick={() => setMode('dark')}>
+          <LightMode />
+        </IconButton> : 
+        <IconButton onClick={() => setMode('light')}>
+          <DarkMode />
+        </IconButton>}
+      </Box>
       <SongPlaying />
       <AppTabs />
     </>
