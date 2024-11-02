@@ -9,7 +9,7 @@ function SongPlaying(props: {song: Song, className?: String}) {
   return (
     <Card className={styles.card + " " + props.className}>
       <CardContent className={styles.cardContent}>
-        <img src="/album-art-tmp.png"
+        <img src={props.song.coverUrl}
           className={styles.albumCover}
           alt="Album art"
         />

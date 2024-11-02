@@ -1,8 +1,8 @@
 export default interface Song {
-    title: String;
-    artist: String;
-    album: String;
-    coverUrl: String;
+    title: string;
+    artist: string;
+    album: string;
+    coverUrl: string;
     lengthMs: number;
     requestCount: number;
 }

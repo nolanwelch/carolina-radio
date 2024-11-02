@@ -4,6 +4,7 @@ import AppTabs from './components/AppTabs';
 import { createTheme, ThemeProvider, useColorScheme } from '@mui/material/styles';
 import SongPlaying from './components/SongPlaying/SongPlaying';
 import { DarkMode, LightMode } from '@mui/icons-material';
+import Song from './types/Song';
 
 export default function MainPage() {
   const { mode, setMode, systemMode } = useColorScheme();
@@ -24,7 +25,14 @@ export default function MainPage() {
           <DarkMode />
         </IconButton>}
       </Box>
-      <SongPlaying />
+      <SongPlaying song={{
+        title: "Example Song",
+        artist: "Example Artist", 
+        album: "Example Album",
+        coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
+        lengthMs: 210000,
+        requestCount: 15
+      } as Song}/>
       <AppTabs />
     </>
   );
