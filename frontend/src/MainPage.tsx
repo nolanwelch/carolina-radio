@@ -18,22 +18,28 @@ export default function MainPage() {
       <CssBaseline />
       <Box sx={{ position: "fixed", top: 12, right: 12 }}>
         {mode === "light" ?
-        <IconButton onClick={() => setMode('dark')}>
-          <LightMode />
-        </IconButton> : 
-        <IconButton onClick={() => setMode('light')}>
-          <DarkMode />
-        </IconButton>}
+          <IconButton onClick={() => setMode('dark')}>
+            <LightMode />
+          </IconButton> :
+          <IconButton onClick={() => setMode('light')}>
+            <DarkMode />
+          </IconButton>}
       </Box>
-      <SongPlaying song={{
-        title: "Example Song",
-        artist: "Example Artist", 
-        album: "Example Album",
-        coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
-        lengthMs: 210000,
-        requestCount: 15
-      } as Song}/>
-      <AppTabs />
+      <Box sx={{ height: "100vh" }}>
+        <Box sx={{ height: "300px", paddingTop: "30px" }}>
+          <SongPlaying song={{
+            title: "Example Song",
+            artist: "Example Artist",
+            album: "Example Album",
+            coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
+            lengthMs: 210000,
+            requestCount: 15
+          } as Song} />
+        </Box>
+        <Box sx={{ height: `calc(100vh - 300px)` }}>
+          <AppTabs />
+        </Box>
+      </Box>
     </>
   );
 }

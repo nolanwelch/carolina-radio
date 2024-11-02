@@ -1,9 +1,5 @@
-import { CssBaseline, FormControl, FormControlLabel, FormLabel, Radio, RadioGroup } from '@mui/material';
 import './App.css';
-import AppTabs from './components/AppTabs';
-import { createTheme, ThemeProvider, useColorScheme } from '@mui/material/styles';
-import { useEffect } from 'react';
-import SongPlaying from './components/SongPlaying/SongPlaying';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 import MainPage from './MainPage';
 
 const theme = createTheme({
@@ -17,6 +13,9 @@ const theme = createTheme({
     secondary: {
       main: '#C4D600',
     },
+    background: {
+      paper: '#EEEEEE'
+    }
   },
 });
 

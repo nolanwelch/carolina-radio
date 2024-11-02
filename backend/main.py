@@ -9,24 +9,45 @@ import dotenv
 import numpy as np
 import pandas as pd
 import requests
+from pydantic import BaseModel
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 
-from fastapi import FastAPI, Response, Request, HTTPException
+from fastapi import FastAPI, Response, Request, HTTPException, Depends, status
 from fastapi.responses import RedirectResponse, HTMLResponse
 api = FastAPI()
+
+dotenv.load_dotenv()
+
 
 @dataclass
 class UserVote:
     tickets: int
     uri: str
 
+class SongRequest(BaseModel):
+    datetime: str
+    songId: str
+    userId: str
+
+
+class Song(BaseModel):
+    spotifyUri: str
+    lengthMs: int
+    title: str
+    artists: list[str]
+    album: str
+    coverUrl: str
+
 
 def get_db():
     uri = os.environ.get("MONGO_URI")
     client = MongoClient(uri, server_api=ServerApi("1"))
     client.admin.command("ping")
-    return client
+    return client["CarolinaRadio"]
+
+
+db = get_db()
 
 N_VOTES_BIAS = 3
 TIME_SINCE_PLAYED_BIAS = 1e-3
@@ -56,7 +77,7 @@ def choose_next_song(votes: UserVote):
 @api.get("/login")
 def read_root():
     state = generate_random_string(20)
-    scope = "user-read-playback-state user-modify-playback-state user-read-currently-playing"
+    scope = "user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing"
 
     params = {
         "response_type": "code",
@@ -68,13 +89,15 @@ def read_root():
     response = RedirectResponse(
         url="https://accounts.spotify.com/authorize?" + urlencode(params)
     )
-    return response, state
+    response.set_cookie(key=os.environ.get("STATE_KEY"), value=state)
+    return response
 
 @api.get("/callback")
-def callback(request: Request, response: Response, stored_state: str):
+def callback(request: Request, response: Response):
 
     code = request.query_params["code"]
     state = request.query_params["state"]
+    stored_state = request.cookies.get(os.environ.get("STATE_KEY"))
 
     if state == None or state != stored_state:
         raise HTTPException(status_code=400, detail="State mismatch")
@@ -108,9 +131,8 @@ def callback(request: Request, response: Response, stored_state: str):
 
         return response
 
-@api.get("/refresh_token")
 def refresh_token(request: Request):
-    refresh_token = request.query_params["refresh_token"]
+    refresh_token = request.cookies.get("refreshToken")
     request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
     encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
     encoded_string = str(encoded_bytes, "utf-8")
@@ -129,8 +151,101 @@ def refresh_token(request: Request):
     else:
         data = response.json()
         access_token = data["access_token"]
+        response = HTMLResponse()
+        response.set_cookie(key="accessToken",value=access_token)
+        if "refresh_token" in data:
+            response.set_cookie(key="refreshToken",value=data["refresh_token"])
+        return response
 
-        return {"access_token": access_token}
+
+@api.post("/request")
+def create_request(request: SongRequest):
+    songs_collection = db["songs"]
+    song_metadata = songs_collection.find_one({"spotifyId": request.songId})
+    if not song_metadata:
+        data = get_song_data(request.songId)
+        if data is None:
+            return None
+        song_data = Song(
+            request.songId,
+            data["durationMs"],
+            data["name"],
+            data["artists"],
+            data["album"]["name"],
+            data["album"]["images"][0]["url"],
+        )
+        # insert song data to songs collection
+        songs_collection.insert_one(song_data)
+    req_collection = db["requests"]
+    req_collection.insert_one(request)
+
+
+def get_song_data(song_id: str):
+    url = f"https://api.spotify.com/v1/tracks/{song_id}"
+    req = requests.get(url)
+    if req.status_code != 200:
+        return None
+    data = req.json()
+
+    data["durationMs"] = get_song_duration(song_id)
+
+    return data
+
+
+@api.get("/search")
+def get_songs(req: Request):
+    query = req.query_params.get("q")
+    access_token = req.cookies.get("accessToken")
+
+    url = "https://api.spotify.com/v1/search/"
+    req = requests.get(
+        url,
+        params={
+            "q": query,
+            "type": "track",
+            "market": "US",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    if req.status_code != 200:
+        raise HTTPException(req.status_code, req.reason)
+
+    tracks = req.json()["tracks"]["items"]
+
+    return [
+        Song(
+            spotifyUri=t["id"],
+            lengthMs=get_song_duration(t["id"], access_token),
+            title=t["name"],
+            artists=[a["name"] for a in t["artists"]],
+            album=t["album"]["name"],
+            coverUrl=t["album"]["images"][0]["url"],
+        )
+        for t in tracks
+    ]
+
+async def get_current_token(request: Request):
+    token = request.cookies.get("accessToken")
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Access token is missing",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    # Optionally, add logic to verify or decode the token here
+    return token
+
+
+def get_song_duration(song_id: str, access_token: str):
+    url = f"https://api.spotify.com/v1/audio-features/{song_id}"
+    req = requests.get(
+        url,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    if req.status_code != 200:
+        return None
+    return int(req.json()["duration_ms"])
+
 
 def generate_random_string(string_length):
     possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
@@ -143,10 +258,9 @@ def generate_random_string(string_length):
     return text
 
 def main():
-    dotenv.load_dotenv()
-    client = get_db()
     votes = [UserVote(1, "test"), UserVote(1, "test2"), UserVote(2, "test3")]
-    print(choose_next_song(votes))
+    # print(choose_next_song(votes))
+
 
 if __name__ == "__main__":
     main()
