@@ -77,7 +77,7 @@ def choose_next_song(votes: UserVote):
 @api.get("/login")
 def read_root():
     state = generate_random_string(20)
-    scope = "user-read-playback-state user-modify-playback-state user-read-currently-playing"
+    scope = "user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing"
 
     params = {
         "response_type": "code",
@@ -193,14 +193,15 @@ def get_song_data(song_id: str):
 
 
 @api.get("/search")
-def get_songs(q: str):
-    access_token = q.cookies.get("accessToken")
+def get_songs(req: Request):
+    query = req.query_params.get("q")
+    access_token = req.cookies.get("accessToken")
 
     url = "https://api.spotify.com/v1/search/"
     req = requests.get(
         url,
         params={
-            "q": q,
+            "q": query,
             "type": "track",
             "market": "US",
         },
@@ -213,12 +214,12 @@ def get_songs(q: str):
 
     return [
         Song(
-            t["id"],
-            get_song_duration(t["id"]),
-            t["name"],
-            t["artists"],
-            t["album"]["name"],
-            t["album"]["images"][0]["url"],
+            spotifyUri=t["id"],
+            lengthMs=get_song_duration(t["id"], access_token),
+            title=t["name"],
+            artists=[a["name"] for a in t["artists"]],
+            album=t["album"]["name"],
+            coverUrl=t["album"]["images"][0]["url"],
         )
         for t in tracks
     ]
@@ -236,10 +237,11 @@ async def get_current_token(request: Request):
     return token
 
 
-def get_song_duration(song_id: str, token: str = Depends(get_current_token)):
+def get_song_duration(song_id: str, access_token: str):
     url = f"https://api.spotify.com/v1/audio-features/{song_id}"
     req = requests.get(
         url,
+        headers={"Authorization": f"Bearer {access_token}"},
     )
     if req.status_code != 200:
         return None
