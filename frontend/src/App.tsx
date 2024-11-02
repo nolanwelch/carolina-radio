@@ -1,9 +1,9 @@
 import { CssBaseline, FormControl, FormControlLabel, FormLabel, Radio, RadioGroup } from '@mui/material';
 import './App.css';
 import AppTabs from './components/AppTabs';
-import SongPlaying from './components/SongPlaying';
 import { createTheme, ThemeProvider, useColorScheme } from '@mui/material/styles';
 import { useEffect } from 'react';
+import SongPlaying from './components/SongPlaying/SongPlaying';
 
 const theme = createTheme({
   colorSchemes: {
