@@ -17,6 +17,9 @@ const theme = createTheme({
     secondary: {
       main: '#C4D600',
     },
+    background: {
+      paper: '#EEEEEE'
+    }
   },
 });
 
