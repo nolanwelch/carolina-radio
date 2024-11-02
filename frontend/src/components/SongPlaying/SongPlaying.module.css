@@ -1,0 +1,22 @@
+.card {
+    text-align: center;
+    width: fit-content;
+
+    margin: 30px auto;
+}
+
+.cardContent {
+    display: flex;
+    flex-direction: row;
+}
+
+.songInformation {
+    display: flex;
+    flex-direction: column;
+}
+
+.albumCover { 
+    height: 100%;
+    width: 200px;
+    text-align: center
+}
