@@ -12,7 +12,7 @@ import requests
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 
-from fastapi import FastAPI, Response, Request, HTTPException
+from fastapi import FastAPI, Response, Request, HTTPException, Depends
 from fastapi.responses import RedirectResponse, HTMLResponse
 api = FastAPI()
 
@@ -112,9 +112,9 @@ def callback(request: Request, response: Response):
 
         return response
 
-@api.get("/refresh_token", response_class=HTMLResponse)
+@api.get("/refresh_token")
 def refresh_token(request: Request):
-    refresh_token = request.query_params["refresh_token"]
+    refresh_token = request.cookies.get("refreshToken")
     request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
     encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
     encoded_string = str(encoded_bytes, "utf-8")
@@ -133,8 +133,11 @@ def refresh_token(request: Request):
     else:
         data = response.json()
         access_token = data["access_token"]
-        
-        return {"access_token": access_token}
+        response = HTMLResponse()
+        response.set_cookie(key="accessToken",value=access_token)
+        if data["refresh_token"]:
+            response.set_cookie(key="refreshToken",value=data["refresh_token"])
+        return response
 
 def generate_random_string(string_length):
     possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
