@@ -26,8 +26,8 @@ def get_db():
     return client
 
 N_VOTES_BIAS = 3
-TIME_SINCE_PLAYED_BIAS = 1e3
-TIME_IN_POOL_BIAS = 1e4
+TIME_SINCE_PLAYED_BIAS = 1e-3
+TIME_IN_POOL_BIAS = 1e-4
 
 
 def get_ticket_count(n_votes, time_since_played_s, time_in_pool_s):
