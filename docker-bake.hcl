@@ -11,7 +11,7 @@ group "release" {
 }
 
 target "server-dev" {
-  dockerfile = "backend/Dockerfile"
+  dockerfile = "Dockerfile"
   tags = ["carolina-radio"]
 }
 
