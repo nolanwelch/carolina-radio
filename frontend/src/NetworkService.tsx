@@ -1,4 +1,5 @@
 const BACKEND_BASE_URL: string = "http://localhost:1234/"; // TODO: update
+const SPOTIFY_API_URL: string = "https://blahblah"; // TODO: update
 
 const NetworkService = {
   getQueue: function() {
@@ -7,7 +8,7 @@ const NetworkService = {
   postSong: function(songId: string) {
 
   },
-  searchSong: function(query: string) {
+  getSearchSong: function(query: string) {
 
   }
 }
