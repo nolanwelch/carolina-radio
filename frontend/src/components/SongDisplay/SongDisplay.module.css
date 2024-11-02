@@ -1,0 +1,47 @@
+.cardContent {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 125px 1fr;
+    grid-template-rows: 1fr auto;
+
+    padding: 16px
+}
+
+.albumCover {
+    grid-column: 1/2;
+    grid-row: 1/4;
+
+    height: 125px;
+    width: 125px
+}
+
+.albumCover img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.songInfo {
+    grid-column: 2/3;
+    grid-row: 1/2;
+    
+    margin-left: 12px;
+
+    display: flex;
+    flex-direction: column;
+}
+
+.songLength {
+    grid-column: 2/3;
+    grid-row: 1/2;
+
+    text-align: right;
+}
+
+.requestCount {
+    grid-column: 2/3;
+    grid-row: 3/4;
+    
+    margin-top: auto;
+    text-align: right;
+}
