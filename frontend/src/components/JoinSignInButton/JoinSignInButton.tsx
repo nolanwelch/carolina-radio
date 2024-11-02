@@ -1,5 +1,5 @@
 import { Login, PlayArrow } from "@mui/icons-material";
-import { Button } from "@mui/material";
+import { Button, Link } from "@mui/material";
 import Cookies from "js-cookie";
 
 export default function JoinSignInButton() {
@@ -10,7 +10,7 @@ export default function JoinSignInButton() {
       Join Radio
     </Button>
     :
-    <Button variant="contained" startIcon={<Login />}>
+    <Button component={Link} href="https://api.carolinaradio.tech/login" variant="contained" startIcon={<Login />}>
       Sign in to Join
     </Button >
 }
