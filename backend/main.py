@@ -224,7 +224,6 @@ def get_songs(req: Request):
         for t in tracks
     ]
 
-
 async def get_current_token(request: Request):
     token = request.cookies.get("accessToken")
     if not token:
