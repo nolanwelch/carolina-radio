@@ -1,11 +1,13 @@
-import React from 'react';
-import logo from './logo.svg';
 import './App.css';
+import AppTabs from './components/AppTabs';
 import SongPlaying from './components/SongPlaying';
 
 function App() {
   return (
-    <SongPlaying />
+    <>
+      <SongPlaying />
+      <AppTabs />
+    </>
   );
 }
 
