@@ -24,6 +24,18 @@ def get_db():
     client.admin.command("ping")
     return client
 
+N_VOTES_BIAS = 3
+TIME_SINCE_PLAYED_BIAS = 1e3
+TIME_IN_POOL_BIAS = 1e4
+
+
+def get_ticket_count(n_votes, time_since_played_s, time_in_pool_s):
+    return (
+        N_VOTES_BIAS * n_votes
+        + TIME_SINCE_PLAYED_BIAS * time_since_played_s
+        + TIME_IN_POOL_BIAS * time_in_pool_s
+    )
+
 
 def choose_next_song(votes: UserVote):
     df = pd.DataFrame(votes)
