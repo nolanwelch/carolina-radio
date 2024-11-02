@@ -258,7 +258,6 @@ def generate_random_string(string_length):
     return text
 
 def main():
-    dotenv.load_dotenv()
     votes = [UserVote(1, "test"), UserVote(1, "test2"), UserVote(2, "test3")]
     # print(choose_next_song(votes))
 
