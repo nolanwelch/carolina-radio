@@ -131,7 +131,6 @@ def callback(request: Request, response: Response):
 
         return response
 
-@api.get("/refresh_token")
 def refresh_token(request: Request):
     refresh_token = request.cookies.get("refreshToken")
     request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
@@ -159,7 +158,7 @@ def refresh_token(request: Request):
         return response
 
 
-@api.post("/request/")
+@api.post("/request")
 def create_request(request: SongRequest):
     songs_collection = db["songs"]
     song_metadata = songs_collection.find_one({"spotifyId": request.songId})
@@ -193,7 +192,7 @@ def get_song_data(song_id: str):
     return data
 
 
-@api.get("/search/")
+@api.get("/search")
 def get_songs(q: str):
     access_token = q.cookies.get("accessToken")
 
