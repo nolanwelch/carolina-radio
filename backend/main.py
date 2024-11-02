@@ -37,9 +37,6 @@ def choose_next_song(votes: UserVote):
     song_uri = np.random.choice(df["uri"], 1, p=df["probability"])[0]
     return str(song_uri)
 
-
-
-
 @api.get("/login")
 def read_root():
     state = generate_random_string(20)
@@ -68,7 +65,7 @@ def callback(request: Request, response: Response, stored_state: str):
     else:
 
         url = "https://accounts.spotify.com/api/token"
-        request_string = os.environ.get("CLIENT_ID") + ":" + CLIENT_SECRET
+        request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
         encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
         encoded_string = str(encoded_bytes, "utf-8")
         header = {
@@ -94,6 +91,30 @@ def callback(request: Request, response: Response, stored_state: str):
             response.set_cookie(key="refreshToken", value=refresh_token)
 
         return response
+
+@api.get("/refresh_token")
+def refresh_token(request: Request):
+    refresh_token = request.query_params["refresh_token"]
+    request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
+    encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
+    encoded_string = str(encoded_bytes, "utf-8")
+    header = {
+            "content-type": "application/x-www-form-urlencoded",
+            "Authorization": "Basic " + encoded_string
+            }
+
+    form_data = {"grant_type": "refresh_token", "refresh_token": refresh_token}
+
+    url = "https://accounts.spotify.com/api/token"
+
+    response = requests.post(url, data=form_data, headers=header)
+    if response.status_code != 200:
+        raise HTTPException(status_code=400, detail="Error with refresh token")
+    else:
+        data = response.json()
+        access_token = data["access_token"]
+
+        return {"access_token": access_token}
 
 def generate_random_string(string_length):
     possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
