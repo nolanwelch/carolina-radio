@@ -3,19 +3,20 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import { CardMedia, Typography } from '@mui/material';
 import styles from "./SongPlaying.module.css";
+import Song from '../../types/Song';
 
-function SongPlaying() {
+function SongPlaying(props: {song: Song, className?: String}) {
   return (
-    <Card className={styles.card}>
+    <Card className={styles.card + " " + props.className}>
       <CardContent className={styles.cardContent}>
         <img src="/album-art-tmp.png"
           className={styles.albumCover}
           alt="Album art"
         />
         <div className={styles.songInformation}>
-          <Typography variant="h6">Song Title</Typography>
-          <Typography variant="body1">Artist Name</Typography>
-          <Typography variant="body1">Requested by 120</Typography>
+          <Typography variant="h6">{props.song.title}</Typography>
+          <Typography variant="body1">{props.song.artist}</Typography>
+          <Typography variant="body1">Requested by {props.song.requestCount} users</Typography>
         </div>
       </CardContent>
     </Card>
