@@ -12,15 +12,6 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import pandas as pd
 
-from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import RedirectResponse, HTMLResponse
-
-STATE_KEY = "spotify_auth_state"
-CLIENT_ID = "15d9c47ab81448a8b7491c83e65b0302"
-REDIRECT_URI = "https://api.carolinaradio.tech/callback"
-
-api = FastAPI()
-
 @dataclass
 class UserVote:
     tickets: int

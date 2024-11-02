@@ -10,16 +10,8 @@ group "release" {
   targets = ["server-release"]
 }
 
-target "common" {
-  dockerfile = "Dockerfile.common"
-  platforms = ["linux/arm64/v8", "linux/amd64"]
-}
-
 target "server-dev" {
-  contexts = {
-    common = "target:common"
-  }
-  dockerfile = "Dockerfile.server"
+  dockerfile = "Dockerfile"
   tags = ["carolina-radio"]
 }
 
