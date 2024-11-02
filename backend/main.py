@@ -40,13 +40,13 @@ def choose_next_song(votes: UserVote):
 @api.get("/login")
 def read_root():
     state = generate_random_string(20)
-    scope = ""
+    scope = "user-read-playback-state user-modify-playback-state user-read-currently-playing"
 
     params = {
         "response_type": "code",
-        "client_id": CLIENT_ID,
+        "client_id": os.environ.get("CLIENT_ID"),
         "scope": scope,
-        "redirect_uri": REDIRECT_URI,
+        "redirect_uri": os.environ.get("REDIRECT_URI"),
         "state": state,
     }
     response = RedirectResponse(
@@ -75,7 +75,7 @@ def callback(request: Request, response: Response, stored_state: str):
 
         form_data = {
             "code": code,
-            "redirect_uri": REDIRECT_URI,
+            "redirect_uri": os.environ.get("REDIRECT_URI"),
             "grant_type": "authorization_code",
         }
 
@@ -86,7 +86,7 @@ def callback(request: Request, response: Response, stored_state: str):
             access_token = data["access_token"]
             refresh_token = data["refresh_token"]
 
-            response = RedirectResponse(url=URI)
+            response = RedirectResponse(url=os.environ.get("URI"))
             response.set_cookie(key="accessToken", value=access_token)
             response.set_cookie(key="refreshToken", value=refresh_token)
 
