@@ -12,5 +12,5 @@ export default function JoinSignInButton() {
     :
     <Button component={Link} href="https://api.carolinaradio.tech/login" variant="contained" startIcon={<Login />}>
       Sign in to Join
-    </Button >
+    </Button>
 }
