@@ -12,7 +12,6 @@ import requests
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 
-
 from fastapi import FastAPI, Response, Request, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse
 api = FastAPI()
