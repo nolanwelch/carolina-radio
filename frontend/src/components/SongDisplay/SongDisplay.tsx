@@ -1,5 +1,4 @@
-import { Card, CardContent, Typography } from '@mui/material';
-import React, { useState } from 'react';
+import { Card, Typography } from '@mui/material';
 import styles from "./SongDisplay.module.css";
 import Song from '../../types/Song';
 
