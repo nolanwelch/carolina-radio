@@ -1,5 +1,6 @@
 import { Box, Tab, Tabs } from '@mui/material';
 import { useState } from 'react';
+import MyQueue from './MyQueue/MyQueue';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -41,7 +42,7 @@ function AppTabs() {
         Next up component here
       </TabPanel>
       <TabPanel value={value} index={1}>
-        Queue component here
+        <MyQueue />
       </TabPanel>
     </>
   );
