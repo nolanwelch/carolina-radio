@@ -322,7 +322,7 @@ async def create_request(request: Request):
             spotifyUri=song_id,
             poolJoinDT=datetime.now(),
         )
-        pool_collection.insert_one(new_entry)
+        pool_collection.insert_one(new_entry.model_dump())
     else:
         pool_collection.find_one_and_update(
             {"song": song}, update={"votes": {"$inc": 1}}
@@ -359,7 +359,7 @@ async def get_songs(req: Request):
     return [
         Song(
             songId=t["id"],
-            durationMs=int(t["duration_ms"]) or -1,
+            durationMs=t["duration_ms"] if "duration_ms" in t else -1,
             title=t["name"],
             artists=[a["name"] for a in t["artists"]],
             album=t["album"]["name"],
