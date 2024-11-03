@@ -4,16 +4,19 @@ import axios, { AxiosResponse } from 'axios';
 import NowPlayingSong from "./types/NowPlayingSong";
 
 const NetworkService = {
-  getNowPlaying: function(): Promise<NowPlayingSong> {
-    return axios.get<NowPlayingSong>(process.env.REACT_APP_API_URL + "/now_playing").then((response: AxiosResponse<NowPlayingSong, any>) => response.data)
+  getNowPlaying: async function(): Promise<NowPlayingSong> {
+    const response = await axios.get<NowPlayingSong>(process.env.REACT_APP_API_URL + "/playing");
+    return response.data;
   },
-  getQueue: function(): Promise<Array<Song>> {
-    return axios.get<Array<Song>>(process.env.REACT_APP_API_URL + "/queue").then((response: AxiosResponse<Song[], any>) => response.data)
+  getQueue: async function(): Promise<Array<Song>> {
+    const response = await axios.get<Array<Song>>(process.env.REACT_APP_API_URL + "/queue");
+    return response.data;
   },
-  getRequestedSongs: function(): Promise<Array<Song>> {
-    return axios.get<Array<Song>>(process.env.REACT_APP_API_URL + "/request", {
+  getRequestedSongs: async function(): Promise<Array<Song>> {
+    const response = await axios.get<Array<Song>>(process.env.REACT_APP_API_URL + "/request", {
       withCredentials: true,
-    }).then((response: AxiosResponse<Song[], any>) => response.data)
+    });
+    return response.data;
   },
   requestSong: function(song: Song) {
     return axios.post<Array<Song>>(process.env.REACT_APP_API_URL + "/request", {id: song.spotifyUri},{
