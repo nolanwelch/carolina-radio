@@ -14,6 +14,7 @@ function SongPlaying(props: {song: Song, className?: String}) {
           alt="Album art"
         />
         <div className={styles.songInformation}>
+        <Typography variant="caption">Now Playing</Typography>
           <Typography variant="h6">{props.song.title}</Typography>
           <Typography variant="body1">{props.song.artist}</Typography>
           <Typography variant="body1">Requested by {props.song.requestCount} users</Typography>
