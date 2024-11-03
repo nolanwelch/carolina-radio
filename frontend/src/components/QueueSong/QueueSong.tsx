@@ -14,6 +14,7 @@ export default function QueueSong() {
   const [inputValue, setInputValue] = React.useState('');
   const [options, setOptions] = React.useState<readonly Song[]>([]);
   const loaded = React.useRef(false);
+  const searchTimeout = React.useRef<ReturnType<typeof setTimeout>|null>();
 
   React.useEffect(() => {
     let active = true;
@@ -23,9 +24,16 @@ export default function QueueSong() {
       return undefined;
     }
 
-    NetworkService.getSearchSong(inputValue).then((songs: Song[]) => {
+    if (searchTimeout != null) {
+      clearTimeout(searchTimeout.current as ReturnType<typeof setTimeout>)
+    }
+    searchTimeout.current = setTimeout(() => {
+      NetworkService.getSearchSong(inputValue).then((songs: Song[]) => {
         setOptions(songs)
-    })
+      })
+      searchTimeout.current = null;
+    }, 500)
+    
 
     return () => {
       active = false;

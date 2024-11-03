@@ -1,9 +1,9 @@
 import { Login, PlayArrow } from "@mui/icons-material";
 import { Button, Link } from "@mui/material";
-import Cookies from "js-cookie";
+import NetworkService from "../../NetworkService";
 
 export default function JoinSignInButton() {
-  const isSignedIn: boolean = Cookies.get("accessToken") ? true : false;
+  const isSignedIn: boolean = NetworkService.isLoggedIn();
 
   return isSignedIn ?
     <Button variant="contained" startIcon={<PlayArrow />}>

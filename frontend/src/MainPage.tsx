@@ -25,6 +25,13 @@ export default function MainPage() {
             <DarkMode />
           </IconButton>}
       </Box>
+      <Box sx={{ position: "fixed", top: 12, left: 12, zIndex: -1 }}>
+        {mode === "light" ?
+        <img src="/carolina-radio-light.png" style={{width: 200, height: "100%"}}></img>
+        :
+        <img src="/carolina-radio-dark.png" style={{width: 200, height: "100%"}}></img>
+        }
+      </Box>
       <Box sx={{ height: "100vh" }}>
         <Box sx={{ height: "300px", paddingTop: "30px" }}>
           <SongPlaying song={{
