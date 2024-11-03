@@ -133,10 +133,6 @@ async def update_radio_queue():
 api = FastAPI(lifespan=lifespan)
 
 
-@api.get("/fuck")
-async def fuck(_: Request):
-    test = await update_radio_queue()
-    print(test)
 
 
 origins = [
@@ -596,24 +592,24 @@ async def get_songs(req: Request):
 #     return req
 
 
-# TODO: Delete
-@api.post("/spotify_queue")
-async def db_to_spot_queue(req: Request):
-    try:
-        ses = get_user_session(req.cookies)
-        access_token = ses.accessToken
-    except HTTPException:
-        return RedirectResponse("/login")
+# # TODO: Delete
+# @api.post("/spotify_queue")
+# async def db_to_spot_queue(req: Request):
+#     try:
+#         ses = get_user_session(req.cookies)
+#         access_token = ses.accessToken
+#     except HTTPException:
+#         return RedirectResponse("/login")
 
-    url = "https://api.spotify.com/v1/me/player/queue"
-    req = requests.post(
-        url,
-        params={"uri": "spotify:track:05JVoLLLqyHmMYrgpOOGNx"},
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    if req.status_code != 204:
-        raise HTTPException(req.status_code, req.reason)
-    return req
+#     url = "https://api.spotify.com/v1/me/player/queue"
+#     req = requests.post(
+#         url,
+#         params={"uri": "spotify:track:05JVoLLLqyHmMYrgpOOGNx"},
+#         headers={"Authorization": f"Bearer {access_token}"},
+#     )
+#     if req.status_code != 204:
+#         raise HTTPException(req.status_code, req.reason)
+#     return req
 
 
 def now_playing():
