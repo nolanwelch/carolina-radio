@@ -357,7 +357,7 @@ def play_song(req: Request):
 def db_to_spot_queue(req: Request):
     try:
         ses = get_user_session(req.cookies)
-        access_token, _ = ses.accessToken
+        access_token = ses.accessToken
     except HTTPException:
         return RedirectResponse("/login")
     
