@@ -283,10 +283,14 @@ def get_song_data(song_id: str):
         return None
     data = req.json()
 
-    data["durationMs"] = get_song_duration(song_id)
-
-    return data
-
+    return Song(
+        songId=song_id,
+        durationMs=get_song_duration(song_id, access_token) or -1,
+        title=data["name"],
+        artists=data["artists"],
+        album=data["album"]["name"],
+        coverUrl=data["album"]["images"][0]["url"],
+    )
 
 @api.get("/search")
 def get_songs(req: Request):
@@ -315,8 +319,8 @@ def get_songs(req: Request):
 
     return [
         Song(
-            spotifyUri=t["id"],
-            lengthMs=get_song_duration(t["id"], access_token),
+            songId=t["id"],
+            durationMs=get_song_duration(t["id"], access_token),
             title=t["name"],
             artists=[a["name"] for a in t["artists"]],
             album=t["album"]["name"],
