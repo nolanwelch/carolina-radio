@@ -354,11 +354,13 @@ async def play_song(req: Request):
         return RedirectResponse("/login")
     
     url = "https://api.spotify.com/v1/me/player/play"
+    songs = get_queue()
+    currentSong, pos_ms = now_playing()
     req = requests.put(
         url,
         json = {
-            "uris":["spotify:track:42VsgItocQwOQC3XWZ8JNA", "spotify:track:66TRwr5uJwPt15mfFkzhbi"],
-            "offset": {"position": 0}
+            "uris":[f"spotify:track:{songs[0]}", f"spotify:track:{songs[1]}", f"spotify:track:{songs[2]}"],
+            "position_ms": pos_ms
         },
         headers={
             "Authorization": f"Bearer {access_token}",
@@ -429,10 +431,33 @@ def set_interval(new_int):
     global interval_seconds
     interval_seconds = new_int
 
+@api.post("/db_to_spot_queue")
+def queue_song_for_user(req: Request):
+    try:
+        ses = get_user_session(req.cookies)
+        access_token = ses.accessToken
+    except HTTPException:
+        return RedirectResponse("/login")
+    
+    url = "https://api.spotify.com/v1/me/player/queue"
+    req = requests.post(
+        url,
+        params = {
+            "uri": "spotify:track:6BJHsLiE47Sk0wQkuppqhr"
+        },
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        }
+    )
+    if req.status_code != 204:
+        raise HTTPException(req.status_code, req.reason)
+    return req
 
 @repeat_every(seconds=lambda: interval_seconds)
 def update_radio_queue():
     pool_collection = db["songPool"]
+    ses_collection = db["sessions"]
+    userSessions = ses_collection.find()
 
     # pop from radio queue, move other songs up
     current_time = datetime.now()
@@ -449,6 +474,22 @@ def update_radio_queue():
         filter={"position": {"$ne": None}},
         update={"$inc": {"position": -1}},
     )
+    
+    for ses in userSessions:
+        try:
+            url = "https://api.spotify.com/v1/me/player/queue"
+            requests.post(
+                url,
+                params = {
+                    "uri": f"spotify:track:{pool_collection.find_one({"position": 2})}"
+                },
+                headers={
+                    "Authorization": f"Bearer {ses["accessToken"]}"
+                }
+            )
+        except:
+            ses_collection.delete_one(ses)
+    
     # get maximum position in queue
     pipeline = [
         {"$match": {"position": {"$ne": None}}},
