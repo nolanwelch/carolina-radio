@@ -83,8 +83,11 @@ def get_ticket_count(n_votes, time_since_played_s, time_in_pool_s):
     )
 
 
-def choose_next_song(votes: UserVote):
-    df = pd.DataFrame(votes)
+def choose_next_song(entries: PoolEntry):
+    df = pd.DataFrame(entries)
+    curr_time = datetime.now()
+    df["timeSincePlayed"] = curr_time - df["lastPlayedDT"]
+    df["timeInPool"] = curr_time - df["poolJoinDT"]
     df["tickets"] = df.apply(
         lambda row: get_ticket_count(
             row["votes"], row["timeSincePlayed"], row["timeInPool"]
