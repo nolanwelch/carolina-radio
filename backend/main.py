@@ -295,7 +295,7 @@ async def create_request(request: Request):
             spotifyUri=song_id,
             poolJoinDT=datetime.now(),
         )
-        pool_collection.insert_one(new_entry)
+        pool_collection.insert_one(new_entry.model_dump())
     else:
         pool_collection.find_one_and_update(
             {"song": song}, update={"votes": {"$inc": 1}}
@@ -309,9 +309,6 @@ def get_song_data(song_id: str, access_token: str):
         headers={"Authorization": f"Bearer {access_token}"},
     )
     if req.status_code != 200:
-        raise HTTPException(
-            req.status_code, detail=f"failing inside get_song_data ({song_id})"
-        )
         raise HTTPException(
             req.status_code, detail=f"failing inside get_song_data ({song_id})"
         )
