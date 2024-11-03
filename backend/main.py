@@ -491,6 +491,6 @@ def get_queue():
 
 
 @api.route("/queue")
-def fetch_queue():
+def fetch_queue(_: Request):
     songs = get_queue()
     return Response(content={"songs": songs})
