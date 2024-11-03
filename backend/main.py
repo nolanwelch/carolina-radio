@@ -46,11 +46,10 @@ async def update_radio_queue(api: FastAPI):
         filter={"position": 0},
         update={
             "$set": {
-                "position": None,
-                "poolJoinDT": None,
                 "votes": 0,
                 "lastPlayedDT": current_time,
-            }
+            },
+            "$unset": {"position": "", "poolJoinDT": ""},
         },
     )
     pool_collection.update_many(
@@ -64,10 +63,10 @@ async def update_radio_queue(api: FastAPI):
             requests.post(
                 url,
                 params={
-                    "uri": f"spotify:track:{pool_collection.find_one({"position": 2})}"
+                    "uri": f"spotify:track:{pool_collection.find_one({'position': QUEUE_SIZE - 1})}"
                 },
                 headers={
-                    "Authorization": f"Bearer {get_user_by_uri(userURI)["accessToken"]}"
+                    "Authorization": f"Bearer {get_user_by_uri(userURI)['accessToken']}"
                 },
             )
         except:
@@ -93,14 +92,7 @@ async def update_radio_queue(api: FastAPI):
             "votes": {"$gt": 0},
         }
     )
-    entries = [
-        PoolEntry(
-            votes=d["votes"],
-            lastPlayedTimestamp=d["lastPlayedDT"],
-            poolJoinTimestamp=d["poolJoinDT"],
-        )
-        for d in data
-    ]
+    entries = [PoolEntry.model_validate(d) for d in data]
     next_id = choose_next_song(entries)
     # add next song to end of queue
     pool_collection.find_one_and_update(
@@ -153,12 +145,12 @@ class SongRequest(BaseModel):
 
 class PoolEntry(BaseModel):
     entryId: str = str(uuid4())
-    position: int = None
+    position: int = -1
     song: Song
-    startDT: datetime = None
+    startDT: datetime = datetime.fromtimestamp(0)
     votes: int
-    lastPlayedDT: datetime = None
-    poolJoinDT: datetime = None
+    lastPlayedDT: datetime = datetime.fromtimestamp(0)
+    poolJoinDT: datetime = datetime.fromtimestamp(0)
 
 def get_db():
     uri = os.environ.get("MONGO_URI")
@@ -230,9 +222,10 @@ def get_user_session(cookies: dict[str, str]):
     session_id = cookies.get("sessionId")
     if session_id is not None:
         ses_collection = db["sessions"]
-        session = UserSession.model_validate(
-            ses_collection.find_one({"sessionId": session_id})
-        )
+        result = ses_collection.find_one({"sessionId": session_id})
+        if result is None:
+            raise HTTPException(status_code=401)
+        session = UserSession.model_validate(result)
         if (datetime.now() - session.startDT).total_seconds() > (60 * 60):
             raise HTTPException(status_code=401)
 
@@ -581,10 +574,11 @@ def update_radio_queue():
     pool_collection.find_one_and_update(
         filter={"position": 0},
         update={
-            "position": None,
-            "poolJoinDT": None,
-            "votes": 0,
-            "lastPlayedDT": current_time,
+            "$set": {
+                "votes": 0,
+                "lastPlayedDT": current_time,
+            },
+            "$unset": {"poolJoinDT": "", "position": ""},
         },
     )
     pool_collection.update_many(
@@ -594,7 +588,7 @@ def update_radio_queue():
     
     for userURI in connected_users:
         url = "https://api.spotify.com/v1/me/player/queue"
-        trackID = pool_collection.find_one({"position": 2})
+        trackID = pool_collection.find_one({"position": QUEUE_SIZE - 1})
         res = request_with_retry("post", url, get_user_by_uri(userURI), {
             "uri": f"spotify:track:{trackID}"
         })
@@ -620,14 +614,7 @@ def update_radio_queue():
             "votes": {"$gt": 0},
         }
     )
-    entries = [
-        PoolEntry(
-            votes=d["votes"],
-            lastPlayedTimestamp=d["lastPlayedDT"],
-            poolJoinTimestamp=d["poolJoinDT"],
-        )
-        for d in data
-    ]
+    entries = [PoolEntry.model_validate(d) for d in data]
     next_id = choose_next_song(entries)
     # add next song to end of queue
     pool_collection.find_one_and_update(
