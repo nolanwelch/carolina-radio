@@ -246,7 +246,8 @@ def create_request(request: Request):
     except HTTPException:
         return RedirectResponse("/login")
 
-    song_id = request.query_params.get("songId")
+    data = request.json()
+    song_id = data.get("songId")
     songs_collection = db["songs"]
     song_metadata = songs_collection.find_one({"spotifyId": song_id})
     if not song_metadata:
@@ -392,7 +393,7 @@ def now_playing():
     pool_collection = db["songPool"]
     result = pool_collection.find_one({"position": 0})
     if result is None:
-        return HTTPException(status_code=404)
+        raise HTTPException(status_code=404)
     top_song = PoolEntry.model_validate(result)
 
     pos_ms = (datetime.now() - top_song.startDT) / timedelta(milliseconds=1)
