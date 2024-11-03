@@ -8,6 +8,7 @@ import Song from './types/Song';
 import NetworkService from './NetworkService';
 import { useEffect, useState } from 'react';
 import NowPlayingSong from './types/NowPlayingSong';
+import styles from "./MainPage.module.css";
 
 export default function MainPage() {
   const { mode, setMode, systemMode } = useColorScheme();
@@ -64,7 +65,7 @@ export default function MainPage() {
             <DarkMode />
           </IconButton>}
       </Box>
-      <Box sx={{ position: "fixed", top: 12, left: 12, zIndex: -1 }}>
+      <Box className={styles.logo}>
         {mode === "light" ?
         <img src="/carolina-radio-light.png" style={{width: 200, height: "100%"}}></img>
         :
