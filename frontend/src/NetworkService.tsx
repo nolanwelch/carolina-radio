@@ -36,8 +36,10 @@ const NetworkService = {
       withCredentials: true,
     }).then((response: AxiosResponse<Song[], any>) => response.data)
   },
-  isLoggedIn: function(): boolean {
-    return Cookies.get("sessionId") ? true : false;
+  isLoggedIn: async function(): Promise<boolean> {
+    return axios.get<boolean>(process.env.REACT_APP_API_URL + "/is_authenticated", {
+      withCredentials: true,
+    }).then((response: AxiosResponse<boolean, any>) => response.data)
   }
 }
 
