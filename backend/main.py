@@ -309,7 +309,12 @@ def get_song_data(song_id: str, access_token: str):
         headers={"Authorization": f"Bearer {access_token}"},
     )
     if req.status_code != 200:
-        return None
+        raise HTTPException(
+            req.status_code, detail=f"failing inside get_song_data ({song_id})"
+        )
+        raise HTTPException(
+            req.status_code, detail=f"failing inside get_song_data ({song_id})"
+        )
     data = req.json()
 
     return Song(
@@ -349,7 +354,7 @@ async def get_songs(req: Request):
     return [
         Song(
             songId=t["id"],
-            durationMs=int(t["duration_ms"]) or -1,
+            durationMs=get_song_duration(t["id"], access_token),
             title=t["name"],
             artists=[a["name"] for a in t["artists"]],
             album=t["album"]["name"],
