@@ -478,6 +478,22 @@ async def create_request(request: Request):
     req_collection.insert_one(new_req.model_dump())
 
     pool_collection = db["songPool"]
+    with client.start_session() as session:
+        with session.start_transaction():
+            # get number of songs in queue
+            n_queued = pool_collection.count_documents({"position": {"$ne": -1}})
+            if n_queued < QUEUE_SIZE:
+                # add to queue at lowest position
+                new_entry = PoolEntry(
+                    song=song,
+                    votes=1,
+                    spotifyUri=song_id,
+                    poolJoinDT=datetime.now(),
+                    position=n_queued,  # for N queued songs, the Nth position is empty
+                )
+                pool_collection.insert_one(new_entry.model_dump())
+                return
+
     pool_song = pool_collection.find_one({"songId": song_id})
     if pool_song is None:
         new_entry = PoolEntry(
