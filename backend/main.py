@@ -386,12 +386,28 @@ async def callback(request: Request, response: Response):
 def connect(req: Request):
     try:
         ses = get_user_session(req.cookies)
-        
-        # catch up to queue
-        
-        connected_users.append(ses.userUri)
+        access_token = ses.accessToken
     except HTTPException:
         return RedirectResponse("/login")
+    
+    url = "https://api.spotify.com/v1/me/player/play"
+    songs = get_queue()
+    currentSong, pos_ms = now_playing()
+    req = requests.put(
+        url,
+        json = {
+            "uris":[f"spotify:track:{songs[0]}", f"spotify:track:{songs[1]}", f"spotify:track:{songs[2]}"],
+            "position_ms": pos_ms
+        },
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+    )
+    if req.status_code != 204:
+        raise HTTPException(req.status_code, req.reason)
+    connected_users.append(ses.userUri)
+    return req
     
 
 # TODO: implement properly
