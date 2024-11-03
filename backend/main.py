@@ -256,7 +256,7 @@ def create_request(request: Request):
         songs_collection.insert_one(song)
 
     req_collection = db["requests"]
-    song = songs_collection.find_one({"songId": song_id})
+    song = Song.model_validate(songs_collection.find_one({"songId": song_id}))
     new_req = SongRequest(requestDT=datetime.now(), song=song, userUri=ses.userUri)
     req_collection.insert_one(new_req.model_dump())
 
