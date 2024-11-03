@@ -78,12 +78,13 @@ async def update_radio_queue(api: FastAPI):
         {"$group": {"_id": None, "max_value": {"$max": "$position"}}},
     ]
     positions = list(pool_collection.aggregate(pipeline))
-    max_pos = int(positions[0]) if positions else 0
+    print(positions)
+    max_pos = int(positions[0]["position"]) if positions else 0
 
     # update wait time to match new top of queue
     current_song = pool_collection.find_one({"position": 0})
-    # if current_song is not None:
-    set_interval(current_song["durationMs"] // 1000)
+    if current_song is not None:
+        set_interval(current_song["durationMs"] // 1000)
 
     # choose next song via raffle method
     data = pool_collection.find(
@@ -205,13 +206,10 @@ def get_ticket_count(n_votes, time_since_played_s, time_in_pool_s):
 def choose_next_song(entries: PoolEntry):
     df = pd.DataFrame(entries)
     curr_time = datetime.now()
-    df["timeSincePlayed"] = curr_time - df["lastPlayedDT"]
-    df["timeInPool"] = curr_time - df["poolJoinDT"]
-    df["tickets"] = df.apply(
-        lambda row: get_ticket_count(
-            row["votes"], row["timeSincePlayed"], row["timeInPool"]
-        )
-    )
+    df["timeSincePlayed"] = curr_time - df["lastPlayedDT"] if "lastPlayedDT" in df else 0
+    df["timeInPool"] = curr_time - df["poolJoinDT"] if "poolJoinDT" in df else 0
+    for _, row in df.iterrows:
+        row["tickets"] = get_ticket_count(row["votes"], row["timeSincePlayed"], row["timeInPool"])
     total_tickets = df["tickets"].sum()
     df["probability"] = df["tickets"] / total_tickets
     song_uri = np.random.choice(df["uri"], 1, p=df["probability"])[0]
