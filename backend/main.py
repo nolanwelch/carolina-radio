@@ -246,7 +246,8 @@ def create_request(request: Request):
     except HTTPException:
         return RedirectResponse("/login")
 
-    song_id = request.query_params.get("songId")
+    data = request.json()
+    song_id = data.get("songId")
     songs_collection = db["songs"]
     song_metadata = songs_collection.find_one({"spotifyId": song_id})
     if not song_metadata:
