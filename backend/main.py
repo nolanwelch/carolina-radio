@@ -174,6 +174,10 @@ class Song(BaseModel):
     durationMs: int
 
 
+class NowPlayingSong(Song):
+    position: float
+
+
 class UserSession(BaseModel):
     startDT: datetime
     userUri: str
@@ -582,16 +586,15 @@ def now_playing():
 
 
 @api.get("/playing")
-async def get_now_playing():
+async def get_now_playing() -> NowPlayingSong:
     try:
         song, pos = now_playing()
     except HTTPException:
         return Response(status_code=404)
 
-    values = song.model_dump()
-    values["position"] = pos
+    
 
-    return json.dumps(values)
+    return NowPlayingSong(songId=song.songId, artists=song.artists, album=song.album, title=song.title, coverUrl=song.coverUrl, durationMs=song.durationMs, position=pos)
 
 
 def generate_random_string(string_length):
