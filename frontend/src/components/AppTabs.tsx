@@ -10,36 +10,6 @@ interface TabPanelProps {
   value: number;
 }
 
-const SAMPLE_SONGS: Song[] = [
-  {
-    spotifyUri: "",
-    title: "Example Song",
-    artists: ["Example Artist"],
-    album: "Example Album",
-    coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
-    lengthMs: 210000,
-    requestCount: 15
-  },
-  {
-    spotifyUri: "",
-    title: "Example Song",
-    artists: ["Example Artist"],
-    album: "Example Album",
-    coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
-    lengthMs: 210000,
-    requestCount: 15
-  },
-  {
-    spotifyUri: "",
-    title: "Example Song",
-    artists: ["Example Artist"],
-    album: "Example Album",
-    coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
-    lengthMs: 210000,
-    requestCount: 15
-  }
-]
-
 function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
 
@@ -57,7 +27,7 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-function AppTabs() {
+function AppTabs(props: {queuedSongs: Song[]}) {
   const [value, setValue] = useState(0);
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
@@ -72,7 +42,7 @@ function AppTabs() {
         </Tabs>
       </Box>
       <TabPanel value={value} index={0}>
-        <NextUp songs={SAMPLE_SONGS} />
+        <NextUp songs={props.queuedSongs} />
       </TabPanel>
       <TabPanel value={value} index={1}>
         <MyQueue />

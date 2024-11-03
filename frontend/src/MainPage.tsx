@@ -5,9 +5,38 @@ import { createTheme, ThemeProvider, useColorScheme } from '@mui/material/styles
 import SongPlaying from './components/SongPlaying/SongPlaying';
 import { DarkMode, LightMode } from '@mui/icons-material';
 import Song from './types/Song';
+import NetworkService from './NetworkService';
+import { useEffect, useState } from 'react';
+import NowPlayingSong from './types/NowPlayingSong';
 
 export default function MainPage() {
   const { mode, setMode, systemMode } = useColorScheme();
+  const [queuedSongs, setQueuedSongs] = useState<Array<Song>>([]);
+  const [currentSong, setCurrentSong] = useState<Song>({
+    spotifyUri: "",
+    title: "Example Song",
+    artists: ["Example Artist"],
+    album: "Example Album",
+    coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
+    lengthMs: 210000,
+    requestCount: 15
+  } as Song);
+
+  function updateQueue() {
+    NetworkService.getQueue().then((songs: Song[]) => setQueuedSongs(songs));
+  }
+
+  function updateNowPlaying() {
+    NetworkService.getNowPlaying().then((nowPlaying: NowPlayingSong) => {
+      setCurrentSong(nowPlaying);
+      setTimeout(updateNowPlaying, nowPlaying.lengthMs - nowPlaying.position);
+    })
+  }
+
+  useEffect(() => {
+    updateQueue();
+    updateNowPlaying();
+  }, [])
 
   if (!mode) {
     setMode(systemMode ?? "dark")
@@ -34,18 +63,10 @@ export default function MainPage() {
       </Box>
       <Box sx={{ height: "100vh" }}>
         <Box sx={{ height: "300px", paddingTop: "30px" }}>
-          <SongPlaying song={{
-            spotifyUri: "",
-            title: "Example Song",
-            artists: ["Example Artist"],
-            album: "Example Album",
-            coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
-            lengthMs: 210000,
-            requestCount: 15
-          } as Song} />
+          <SongPlaying song={currentSong} />
         </Box>
         <Box sx={{ height: `calc(100vh - 300px)` }}>
-          <AppTabs />
+          <AppTabs queuedSongs={queuedSongs} />
         </Box>
       </Box>
     </>
