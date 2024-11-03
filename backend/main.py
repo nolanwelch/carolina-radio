@@ -388,15 +388,25 @@ def get_song_duration(song_id: str, access_token: str):
         return None
     return int(req.json()["duration_ms"])
 
-@api.get("/playing")
-def now_playing(req: Request):
+def now_playing(_: Request):
     pool_collection = db["songPool"]
-    curr_song = pool_collection.find_one({"position": 0})
-    if curr_song is None:
+    result = pool_collection.find_one({"position": 0})
+    if result is None:
+        return HTTPException(status_code=404)
+    top_song = PoolEntry.model_validate(result)
+
+    pos_ms = (datetime.now() - top_song.startDT) / timedelta(milliseconds=1)
+    return Song.model_validate(top_song["song"]), pos_ms
+
+
+@api.get("/playing")
+def get_now_playing(req: Request):
+    try:
+        song, pos = now_playing(req)
+    except HTTPException:
         return Response(status_code=404)
 
-    pos_ms = (datetime.now() - curr_song["startDT"]) / timedelta(milliseconds=1)
-    return Response(content={"song": curr_song["song"], "position": pos_ms})
+    return Response(content={"song": song.model_dump(), "position": pos})
 
 
 def generate_random_string(string_length):
