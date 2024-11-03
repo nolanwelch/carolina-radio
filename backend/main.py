@@ -51,7 +51,7 @@ class UserSession(BaseModel):
     userUri: str
     accessToken: str = None
     refreshToken: str = None
-    sessionId: str = uuid4()
+    sessionId: str = str(uuid4())
 
 
 class SongRequest(BaseModel):
@@ -135,6 +135,9 @@ def read_root():
         url="https://accounts.spotify.com/authorize?" + urlencode(params)
     )
     response.set_cookie(key=os.environ.get("STATE_KEY"), value=state)
+    response.set_cookie(
+        "sessionId",
+    )
     return response
 
 @api.get("/callback")
@@ -196,7 +199,7 @@ def callback(request: Request, response: Response):
                 accessToken=access_token,
                 refreshToken=refresh_token,
             )
-            ses_collection.insert_one(session)
+            ses_collection.insert_one(session.model_dump())
 
             response.set_cookie(key="sessionId", value=session.sessionId)
 
