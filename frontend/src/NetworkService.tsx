@@ -32,7 +32,7 @@ const NetworkService = {
     }).then((response: AxiosResponse<Song[], any>) => response.data)
   },
   isLoggedIn: function(): boolean {
-    return Cookies.get("accessToken") ? true : false;
+    return Cookies.get("sessionId") ? true : false;
   }
 }
 
