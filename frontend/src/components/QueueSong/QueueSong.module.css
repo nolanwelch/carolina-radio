@@ -1,6 +1,8 @@
 .queueSongContainer {
+    width: 100%;
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
 
     align-items: center;
 
@@ -9,4 +11,17 @@
     gap: 20px;
 
     margin: 0 auto;
+}
+
+.searchResultImg {
+    width: 44px;
+    height: 44px;
+    margin-right: 4px;
+    transform: translateX(-8px);
+
+    object-fit: cover;
+}
+
+.searchBar {
+    width: min(450px, 90%);
 }

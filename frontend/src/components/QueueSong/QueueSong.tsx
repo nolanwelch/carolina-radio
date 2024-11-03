@@ -18,6 +18,7 @@ export default function QueueSong() {
   const [options, setOptions] = React.useState<readonly Song[]>([]);
   const loaded = React.useRef(false);
   const searchTimeout = React.useRef<ReturnType<typeof setTimeout>|null>();
+  const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
     let active = true;
@@ -31,8 +32,11 @@ export default function QueueSong() {
       clearTimeout(searchTimeout.current as ReturnType<typeof setTimeout>)
     }
     searchTimeout.current = setTimeout(() => {
+      setLoading(true);
+      setOptions([]);
       NetworkService.getSearchSong(inputValue).then((songs: Song[]) => {
         setOptions(songs)
+        setLoading(false);
       })
       searchTimeout.current = null;
     }, 500)
@@ -46,21 +50,20 @@ export default function QueueSong() {
   return (
     <div className={styles.queueSongContainer}>
       <Autocomplete
-        sx={{ width: 300 }}
+        className={styles.searchBar}
         size="medium"
         forcePopupIcon={false}
-        getOptionLabel={(option) =>
-          typeof option === 'string' ? option : option.songId
-        }
+        getOptionLabel={(option) => option.title}
+        getOptionKey={(option) => option.songId}
         filterOptions={(x) => x}
         options={options}
         autoComplete
+        loading={loading}
         filterSelectedOptions
         value={value}
         noOptionsText="No Matching Songs"
         onChange={(event: any, newValue: Song | null) => {
           setValue(newValue);
-          console.log(newValue)
         }}
         onInputChange={(event, newInputValue) => {
           setInputValue(newInputValue);
@@ -69,12 +72,14 @@ export default function QueueSong() {
           <TextField {...params} label="Song to Queue" fullWidth />
         )}
         renderOption={(props, option) => {
-          console.log(props);
           const { key, ...optionProps } = props;
 
           return (
             <li key={key} {...optionProps}>
               <Grid container sx={{ alignItems: 'center' }}>
+                <Grid item sx={{ display: 'flex', width: 44 }}>
+                  <img src={option.coverUrl} className={styles.searchResultImg} />
+                </Grid>
                 <Grid item sx={{ width: 'calc(100% - 44px)', wordWrap: 'break-word' }}>
                   <Box
                       component="span"
