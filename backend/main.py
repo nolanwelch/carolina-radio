@@ -18,8 +18,99 @@ from pymongo.server_api import ServerApi
 
 from fastapi import FastAPI, Response, Request, HTTPException, Depends, status
 from fastapi.responses import RedirectResponse, HTMLResponse
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
-api = FastAPI()
+
+QUEUE_SIZE = 5
+
+
+# @repeat_every(seconds=lambda: interval_seconds)
+@asynccontextmanager
+async def update_radio_queue(api: FastAPI):
+    pool_collection = db["songPool"]
+
+    # handle case where queue is empty
+    if pool_collection.find_one({"position": 0}) is None:
+        entries = pool_collection.find().to_list()
+        for i, entry in enumerate(entries, start=max(0, len(entries) - QUEUE_SIZE)):
+            entry = PoolEntry.model_validate(entry)
+            pool_collection.find_one_and_update(
+                {"entryId": entry.entryId}, {"$set": {"position": i + 1}}
+            )
+
+        yield  # go go gadget api
+
+    # pop from radio queue, move other songs up
+    current_time = datetime.now()
+    pool_collection.find_one_and_update(
+        filter={"position": 0},
+        update={
+            "$set": {
+                "position": None,
+                "poolJoinDT": None,
+                "votes": 0,
+                "lastPlayedDT": current_time,
+            }
+        },
+    )
+    pool_collection.update_many(
+        filter={"position": {"$ne": None}},
+        update={"$inc": {"position": -1}},
+    )
+
+    for userURI in connected_users:
+        try:
+            url = "https://api.spotify.com/v1/me/player/queue"
+            requests.post(
+                url,
+                params={
+                    "uri": f"spotify:track:{pool_collection.find_one({"position": 2})}"
+                },
+                headers={
+                    "Authorization": f"Bearer {get_user_by_uri(userURI)["accessToken"]}"
+                },
+            )
+        except:
+            connected_users.remove(userURI)
+
+    # get maximum position in queue
+    pipeline = [
+        {"$match": {"position": {"$ne": None}}},
+        {"$group": {"_id": None, "max_value": {"$max": "$position"}}},
+    ]
+    positions = list(pool_collection.aggregate(pipeline))
+    max_pos = int(positions[0]) if positions else 0
+
+    # update wait time to match new top of queue
+    current_song = pool_collection.find_one({"position": 0})
+    # if current_song is not None:
+    set_interval(current_song["durationMs"] // 1000)
+
+    # choose next song via raffle method
+    data = pool_collection.find(
+        {
+            "position": {"$eq": None},
+            "votes": {"$gt": 0},
+        }
+    )
+    entries = [
+        PoolEntry(
+            votes=d["votes"],
+            lastPlayedTimestamp=d["lastPlayedDT"],
+            poolJoinTimestamp=d["poolJoinDT"],
+        )
+        for d in data
+    ]
+    next_id = choose_next_song(entries)
+    # add next song to end of queue
+    pool_collection.find_one_and_update(
+        filter={"songId": next_id}, update={"position": max_pos}
+    )
+
+    yield  # let FastAPI do its thing
+
+
+api = FastAPI(lifespan=update_radio_queue)
 
 origins = [
     "https://carolinaradio.tech",
@@ -61,6 +152,7 @@ class SongRequest(BaseModel):
 
 
 class PoolEntry(BaseModel):
+    entryId: str = str(uuid4())
     position: int = None
     song: Song
     startDT: datetime = None
@@ -338,7 +430,7 @@ def get_song_data(song_id: str, ses: UserSession):
         songId=song_id,
         durationMs=int(data["duration_ms"]) or -1,
         title=data["name"],
-        artists=data["artists"],
+        artists=[a["name"] for a in data["artists"]],
         album=data["album"]["name"],
         coverUrl=data["album"]["images"][0]["url"],
     )
