@@ -36,30 +36,28 @@ api.add_middleware(
 dotenv.load_dotenv()
 
 
-@dataclass
-class UserVote:
-    tickets: int
-    uri: str
+class Song(BaseModel):
+    songId: str
+    artists: list[str]
+    album: str
+    title: str
+    coverUrl: str
+    durationMs: int
+
 
 class SongRequest(BaseModel):
-    datetime: str
-    songId: str
+    requestDT: datetime
+    song: Song
     userId: str
 
 
-class Song(BaseModel):
-    spotifyUri: str
-    lengthMs: int
-    title: str
-    artists: list[str]
-    album: str
-    coverUrl: str
-    
 class PoolEntry(BaseModel):
+    position: int = None
+    song: Song
+    startDT: datetime = None
     votes: int
-    spotifyUri: str
-    lastPlayedTimestamp: int
-    poolJoinTimestamp: int
+    lastPlayedDT: datetime
+    poolJoinDT: datetime
 
 def get_db():
     uri = os.environ.get("MONGO_URI")
