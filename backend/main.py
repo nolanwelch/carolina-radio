@@ -232,7 +232,7 @@ def play_song(req: Request):
     req = requests.put(
         url,
         json = {
-            "uris":["spotify:track:4iV5W9uYEdYUVa79Axb7Rh", "spotify:track:1301WleyT98MSxVHPZCA6M"],
+            "uris":["spotify:track:42VsgItocQwOQC3XWZ8JNA", "spotify:track:66TRwr5uJwPt15mfFkzhbi"],
             "offset": {"position": 0}
         },
         headers={
@@ -240,20 +240,27 @@ def play_song(req: Request):
             "Content-Type": "application/json"
         }
     )
-    if req.status_code != 200:
+    if req.status_code != 204:
         raise HTTPException(req.status_code, req.reason)
     return req
 
-async def get_current_token(request: Request):
-    token = request.cookies.get("accessToken")
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Access token is missing",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    # Optionally, add logic to verify or decode the token here
-    return token
+@api.post("/spotify_queue")
+def db_to_spot_queue(req: Request):
+    access_token = req.cookies.get("accessToken")
+    
+    url = "https://api.spotify.com/v1/me/player/queue"
+    req = requests.post(
+        url,
+        params = {
+            "uri": "spotify:track:05JVoLLLqyHmMYrgpOOGNx"
+        },
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        }
+    )
+    if req.status_code != 204:
+        raise HTTPException(req.status_code, req.reason)
+    return req
 
 
 def get_song_duration(song_id: str, access_token: str):
