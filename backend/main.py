@@ -314,6 +314,16 @@ def get_song_duration(song_id: str, access_token: str):
         return None
     return int(req.json()["duration_ms"])
 
+@api.get("/playing")
+def now_playing(req: Request):
+    pool_collection = db["songPool"]
+    curr_song = pool_collection.find_one({"position": 0})
+    if curr_song is None:
+        return Response(status_code=404)
+
+    seek_time_ms = datetime.now() - curr_song["startDT"]
+    return Response(content={"song": curr_song["song"], "seekMs": seek_time_ms})
+
 
 def generate_random_string(string_length):
     possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
