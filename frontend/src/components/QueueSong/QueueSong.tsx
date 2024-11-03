@@ -100,6 +100,7 @@ export default function QueueSong(props: {addSong: (song: Song) => void}) {
         if (value) {
           NetworkService.requestSong(value);
           setValue(null);
+          props.addSong(value)
         }
         }}>
         Request Song
