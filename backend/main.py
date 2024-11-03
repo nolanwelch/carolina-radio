@@ -382,7 +382,7 @@ async def callback(request: Request, response: Response):
         return response
 
 
-@api.post("/join")
+@api.put("/join")
 def connect(req: Request):
     try:
         ses = get_user_session(req.cookies)
@@ -396,8 +396,8 @@ def connect(req: Request):
     req = requests.put(
         url,
         json = {
-            "uris":[f"spotify:track:{songs[0]}", f"spotify:track:{songs[1]}", f"spotify:track:{songs[2]}"],
-            "position_ms": pos_ms
+            "uris": [f"spotify:track:{currentSong.songId}"] + [f"spotify:track:{s.songId}" for s in songs[:min(len(songs), 2)]],
+            "position_ms": int(pos_ms)
         },
         headers={
             "Authorization": f"Bearer {access_token}",
@@ -558,31 +558,31 @@ async def get_songs(req: Request):
     ]
     
 # TODO: Delete
-@api.put("/start_resume")
-async def play_song(req: Request):
-    try:
-        ses = get_user_session(req.cookies)
-        access_token = ses.accessToken
-    except HTTPException:
-        return RedirectResponse("/login")
+# @api.put("/start_resume")
+# async def play_song(req: Request):
+#     try:
+#         ses = get_user_session(req.cookies)
+#         access_token = ses.accessToken
+#     except HTTPException:
+#         return RedirectResponse("/login")
     
-    url = "https://api.spotify.com/v1/me/player/play"
-    songs = get_queue()
-    currentSong, pos_ms = now_playing()
-    req = requests.put(
-        url,
-        json = {
-            "uris":[f"spotify:track:{songs[0]}", f"spotify:track:{songs[1]}", f"spotify:track:{songs[2]}"],
-            "position_ms": pos_ms
-        },
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
-        }
-    )
-    if req.status_code != 204:
-        raise HTTPException(req.status_code, req.reason)
-    return req
+#     url = "https://api.spotify.com/v1/me/player/play"
+#     songs = get_queue()
+#     currentSong, pos_ms = now_playing()
+#     req = requests.put(
+#         url,
+#         json = {
+#             "uris": [f"spotify:track:{currentSong.songId}"] + [f"spotify:track:{s.songId}" for s in songs[:min(len(songs), 2)]],
+#             "position_ms": int(pos_ms)
+#         },
+#         headers={
+#             "Authorization": f"Bearer {access_token}",
+#             "Content-Type": "application/json"
+#         }
+#     )
+#     if req.status_code != 204:
+#         raise HTTPException(req.status_code, req.reason)
+#     return req
 
 
 # TODO: Delete
