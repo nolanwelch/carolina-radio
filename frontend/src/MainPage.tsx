@@ -28,9 +28,15 @@ export default function MainPage() {
   }
 
   function updateNowPlaying() {
+    updateQueue()
     NetworkService.getNowPlaying().then((nowPlaying: NowPlayingSong) => {
       setCurrentSong(nowPlaying);
-      setTimeout(updateNowPlaying, nowPlaying.durationMs - nowPlaying.position);
+      if (nowPlaying.durationMs - nowPlaying.position > 0) {
+        setTimeout(updateNowPlaying, nowPlaying.durationMs - nowPlaying.position);
+        console.log("Will update in " + (nowPlaying.durationMs - nowPlaying.position)/1000)
+      } else {
+        console.log("Something went wrong, will no longer update")
+      }
     }).catch(() => {
       setCurrentSong({
         songId: "",
@@ -45,7 +51,6 @@ export default function MainPage() {
   }
 
   useEffect(() => {
-    updateQueue();
     updateNowPlaying();
   }, [])
 
