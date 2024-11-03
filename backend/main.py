@@ -56,8 +56,8 @@ class PoolEntry(BaseModel):
     song: Song
     startDT: datetime = None
     votes: int
-    lastPlayedDT: datetime
-    poolJoinDT: datetime
+    lastPlayedDT: datetime = None
+    poolJoinDT: datetime = None
 
 def get_db():
     uri = os.environ.get("MONGO_URI")
