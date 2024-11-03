@@ -249,7 +249,7 @@ async def create_request(request: Request):
     data = await request.json()
     song_id = data.get("songId")
     songs_collection = db["songs"]
-    song_metadata = songs_collection.find_one({"spotifyId": song_id})
+    song_metadata = songs_collection.find_one({"songId": song_id})
     if not song_metadata:
         song = get_song_data(song_id, access_token)
         if song is None:
