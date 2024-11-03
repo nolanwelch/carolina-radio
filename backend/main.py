@@ -276,9 +276,12 @@ def create_request(request: Request):
         )
 
 
-def get_song_data(song_id: str):
+def get_song_data(song_id: str, access_token: str):
     url = f"https://api.spotify.com/v1/tracks/{song_id}"
-    req = requests.get(url)
+    req = requests.get(
+        url,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
     if req.status_code != 200:
         return None
     data = req.json()
