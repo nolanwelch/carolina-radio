@@ -81,6 +81,7 @@ N_VOTES_BIAS = 3
 TIME_SINCE_PLAYED_BIAS = 1e-3
 TIME_IN_POOL_BIAS = 1e-4
 
+connected_users = []
 
 def get_ticket_count(n_votes, time_since_played_s, time_in_pool_s):
     return (
@@ -206,6 +207,18 @@ async def callback(request: Request, response: Response):
             response.set_cookie(key="sessionId", value=session.sessionId)
 
         return response
+    
+@api.post("/join")
+def connect(req: Request):
+    try:
+        ses = get_user_session(req.cookies)
+        
+        # catch up to queue
+        
+        connected_users.append(ses.userUri)
+    except HTTPException:
+        return RedirectResponse("/login")
+    
 
 def refresh_token(request: Request):
     try:
@@ -354,11 +367,13 @@ async def play_song(req: Request):
         return RedirectResponse("/login")
     
     url = "https://api.spotify.com/v1/me/player/play"
+    songs = get_queue()
+    currentSong, pos_ms = now_playing()
     req = requests.put(
         url,
         json = {
-            "uris":["spotify:track:42VsgItocQwOQC3XWZ8JNA", "spotify:track:66TRwr5uJwPt15mfFkzhbi"],
-            "offset": {"position": 0}
+            "uris":[f"spotify:track:{songs[0]}", f"spotify:track:{songs[1]}", f"spotify:track:{songs[2]}"],
+            "position_ms": pos_ms
         },
         headers={
             "Authorization": f"Bearer {access_token}",
@@ -429,6 +444,34 @@ def set_interval(new_int):
     global interval_seconds
     interval_seconds = new_int
 
+@api.post("/db_to_spot_queue")
+def queue_song_for_user(req: Request):
+    try:
+        ses = get_user_session(req.cookies)
+        access_token = ses.accessToken
+    except HTTPException:
+        return RedirectResponse("/login")
+    
+    url = "https://api.spotify.com/v1/me/player/queue"
+    req = requests.post(
+        url,
+        params = {
+            "uri": "spotify:track:6BJHsLiE47Sk0wQkuppqhr"
+        },
+        headers={
+            "Authorization": f"Bearer {access_token}"
+        }
+    )
+    if req.status_code != 204:
+        raise HTTPException(req.status_code, req.reason)
+    return req
+
+def get_user_by_uri(uri: str):
+    ses_collection = db["sessions"]
+    user = ses_collection.find_one(
+        filter={"userUri": uri}
+    )
+    return user
 
 @repeat_every(seconds=lambda: interval_seconds)
 def update_radio_queue():
@@ -449,6 +492,22 @@ def update_radio_queue():
         filter={"position": {"$ne": None}},
         update={"$inc": {"position": -1}},
     )
+    
+    for userURI in connected_users:
+        try:
+            url = "https://api.spotify.com/v1/me/player/queue"
+            requests.post(
+                url,
+                params = {
+                    "uri": f"spotify:track:{pool_collection.find_one({"position": 2})}"
+                },
+                headers={
+                    "Authorization": f"Bearer {get_user_by_uri(userURI)["accessToken"]}"
+                }
+            )
+        except:
+            connected_users.remove(userURI)
+    
     # get maximum position in queue
     pipeline = [
         {"$match": {"position": {"$ne": None}}},
