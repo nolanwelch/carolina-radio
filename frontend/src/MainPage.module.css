@@ -1,0 +1,12 @@
+.logo {
+    position: fixed;
+    top: 12;
+    left: 12;
+    z-index: -1;
+}
+
+@media (max-width: 600px) {
+    .logo {
+        display: none;
+    }
+}

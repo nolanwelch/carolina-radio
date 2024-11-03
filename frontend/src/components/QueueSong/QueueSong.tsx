@@ -12,7 +12,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { Button } from '@mui/material';
 import styles from "./QueueSong.module.css";
 
-export default function QueueSong() {
+export default function QueueSong(props: {addSong: (song: Song) => void}) {
   const [value, setValue] = React.useState<Song | null>(null);
   const [inputValue, setInputValue] = React.useState('');
   const [options, setOptions] = React.useState<readonly Song[]>([]);

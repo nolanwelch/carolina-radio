@@ -18,8 +18,91 @@ from pymongo.server_api import ServerApi
 
 from fastapi import FastAPI, Response, Request, HTTPException, Depends, status
 from fastapi.responses import RedirectResponse, HTMLResponse
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
-api = FastAPI()
+
+QUEUE_SIZE = 5
+
+
+# @repeat_every(seconds=lambda: interval_seconds)
+@asynccontextmanager
+async def update_radio_queue(api: FastAPI):
+    pool_collection = db["songPool"]
+
+    # handle case where queue is empty
+    if pool_collection.find_one({"position": 0}) is None:
+        entries = pool_collection.find().to_list()
+        for i, entry in enumerate(entries, start=max(0, len(entries) - QUEUE_SIZE)):
+            entry = PoolEntry.model_validate(entry)
+            pool_collection.find_one_and_update(
+                {"entryId": entry.entryId}, {"$set": {"position": i + 1}}
+            )
+
+        yield  # go go gadget api
+
+    # pop from radio queue, move other songs up
+    current_time = datetime.now()
+    pool_collection.find_one_and_update(
+        filter={"position": 0},
+        update={
+            "$set": {
+                "votes": 0,
+                "lastPlayedDT": current_time,
+            },
+            "$unset": {"position": "", "poolJoinDT": ""},
+        },
+    )
+    pool_collection.update_many(
+        filter={"position": {"$ne": None}},
+        update={"$inc": {"position": -1}},
+    )
+
+    for userURI in connected_users:
+        try:
+            url = "https://api.spotify.com/v1/me/player/queue"
+            requests.post(
+                url,
+                params={
+                    "uri": f"spotify:track:{pool_collection.find_one({'position': QUEUE_SIZE - 1})}"
+                },
+                headers={
+                    "Authorization": f"Bearer {get_user_by_uri(userURI)['accessToken']}"
+                },
+            )
+        except:
+            connected_users.remove(userURI)
+
+    # get maximum position in queue
+    pipeline = [
+        {"$match": {"position": {"$ne": None}}},
+        {"$group": {"_id": None, "max_value": {"$max": "$position"}}},
+    ]
+    positions = list(pool_collection.aggregate(pipeline))
+    max_pos = int(positions[0]) if positions else 0
+
+    # update wait time to match new top of queue
+    current_song = pool_collection.find_one({"position": 0})
+    # if current_song is not None:
+    set_interval(current_song["durationMs"] // 1000)
+
+    # choose next song via raffle method
+    data = pool_collection.find(
+        {
+            "position": {"$eq": None},
+            "votes": {"$gt": 0},
+        }
+    )
+    entries = [PoolEntry.model_validate(d) for d in data]
+    next_id = choose_next_song(entries)
+    # add next song to end of queue
+    pool_collection.find_one_and_update(
+        filter={"songId": next_id}, update={"position": max_pos}
+    )
+
+    yield  # let FastAPI do its thing
+
+
+api = FastAPI(lifespan=update_radio_queue)
 
 origins = [
     "https://carolinaradio.tech",
@@ -61,12 +144,13 @@ class SongRequest(BaseModel):
 
 
 class PoolEntry(BaseModel):
-    position: int = None
+    entryId: str = str(uuid4())
+    position: int = -1
     song: Song
-    startDT: datetime = None
+    startDT: datetime = datetime.fromtimestamp(0)
     votes: int
-    lastPlayedDT: datetime = None
-    poolJoinDT: datetime = None
+    lastPlayedDT: datetime = datetime.fromtimestamp(0)
+    poolJoinDT: datetime = datetime.fromtimestamp(0)
 
 def get_db():
     uri = os.environ.get("MONGO_URI")
@@ -81,6 +165,34 @@ N_VOTES_BIAS = 3
 TIME_SINCE_PLAYED_BIAS = 1e-3
 TIME_IN_POOL_BIAS = 1e-4
 
+def request_with_retry_using_req(mode: str, url: str, req: Request, params: dict = {}) -> Response:
+    try:
+        ses = get_user_session(req.cookies)
+    except HTTPException:
+        return RedirectResponse("/login")
+    return request_with_retry(mode, url, ses, params)
+
+
+def _do_request(mode: str, url: str, accessToken: str, params: dict = {}) -> Response:
+    return requests.request(
+        mode.upper(),
+        url,
+        params=params,
+        headers={"Authorization": f"Bearer {accessToken}"}
+    )
+
+def request_with_retry(mode: str, url: str, ses: UserSession, params: dict = {}) -> Response:
+    response = _do_request(mode, url, ses.accessToken, params)
+    if response.status_code == 401:
+        print("Refreshing token")
+        refresh_token(ses)
+        response = _do_request(mode, url, get_user_by_uri(ses.userUri).accessToken, params)
+    if not response.ok:
+        raise HTTPException(500, f"[{response.status_code}] {response.reason}")
+    
+    return response
+
+connected_users = []
 
 def get_ticket_count(n_votes, time_since_played_s, time_in_pool_s):
     return (
@@ -110,9 +222,10 @@ def get_user_session(cookies: dict[str, str]):
     session_id = cookies.get("sessionId")
     if session_id is not None:
         ses_collection = db["sessions"]
-        session = UserSession.model_validate(
-            ses_collection.find_one({"sessionId": session_id})
-        )
+        result = ses_collection.find_one({"sessionId": session_id})
+        if result is None:
+            raise HTTPException(status_code=401)
+        session = UserSession.model_validate(result)
         if (datetime.now() - session.startDT).total_seconds() > (60 * 60):
             raise HTTPException(status_code=401)
 
@@ -206,13 +319,65 @@ async def callback(request: Request, response: Response):
             response.set_cookie(key="sessionId", value=session.sessionId)
 
         return response
-
-def refresh_token(request: Request):
+    
+@api.post("/join")
+def connect(req: Request):
     try:
-        ses = get_user_session(request.cookies)
-        refresh_token = ses.refreshToken
+        ses = get_user_session(req.cookies)
+        access_token = ses.accessToken
     except HTTPException:
         return RedirectResponse("/login")
+    
+    # Catch up to queue
+    url = "https://api.spotify.com/v1/me/player/play"
+    songs = get_queue()
+    currentSong, pos_ms = now_playing()
+    req = requests.put(
+        url,
+        json = {
+            "uris":[f"spotify:track:{songs[0]}", f"spotify:track:{songs[1]}", f"spotify:track:{songs[2]}"],
+            "position_ms": pos_ms
+        },
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+    )
+    if req.status_code != 204:
+        raise HTTPException(req.status_code, req.reason)
+    
+    # Add to connected users
+    connected_users.append(ses.userUri)
+    
+# TODO: Delete once implemented into join
+@api.put("/start_resume")
+async def play_song(req: Request):
+    try:
+        ses = get_user_session(req.cookies)
+        access_token = ses.accessToken
+    except HTTPException:
+        return RedirectResponse("/login")
+    
+    url = "https://api.spotify.com/v1/me/player/play"
+    songs = get_queue()
+    currentSong, pos_ms = now_playing()
+    req = requests.put(
+        url,
+        json = {
+            "uris":[f"spotify:track:{songs[0]}", f"spotify:track:{songs[1]}", f"spotify:track:{songs[2]}"],
+            "position_ms": pos_ms
+        },
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+    )
+    if req.status_code != 204:
+        raise HTTPException(req.status_code, req.reason)
+    return req
+
+# TODO: implement properly
+def refresh_token(ses: UserSession):
     request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
     encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
     encoded_string = str(encoded_bytes, "utf-8")
@@ -230,12 +395,17 @@ def refresh_token(request: Request):
         raise HTTPException(status_code=400, detail="Error with refresh token")
     else:
         data = response.json()
-        access_token = data["access_token"]
-        response = HTMLResponse()
-        response.set_cookie(key="accessToken",value=access_token)
+        updates = {
+            "accessToken": data["access_token"],
+        }
         if "refresh_token" in data:
-            response.set_cookie(key="refreshToken",value=data["refresh_token"])
-        return response
+            updates["refreshToken"] = data["refresh_token"]
+        
+        user_collection = db["sessions"]
+
+        user_collection.find_one_and_update(
+            {"userUri": ses.userUri}, update=updates
+        )
 
 
 @api.get("/request")
@@ -254,7 +424,6 @@ async def get_user_requests(request: Request) -> list[Song]:
 async def create_request(request: Request):
     try:
         ses = get_user_session(request.cookies)
-        access_token = ses.accessToken
     except HTTPException:
         return RedirectResponse("/login")
 
@@ -263,7 +432,7 @@ async def create_request(request: Request):
     songs_collection = db["songs"]
     song_metadata = songs_collection.find_one({"songId": song_id})
     if not song_metadata:
-        song = get_song_data(song_id, access_token)
+        song = get_song_data(song_id, ses)
         if song is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"Song {song_id} not found")
         songs_collection.insert_one(song.model_dump())
@@ -282,61 +451,44 @@ async def create_request(request: Request):
             spotifyUri=song_id,
             poolJoinDT=datetime.now(),
         )
-        pool_collection.insert_one(new_entry)
+        pool_collection.insert_one(new_entry.model_dump())
     else:
         pool_collection.find_one_and_update(
             {"song": song}, update={"votes": {"$inc": 1}}
         )
 
 
-def get_song_data(song_id: str, access_token: str):
+def get_song_data(song_id: str, ses: UserSession):
     url = f"https://api.spotify.com/v1/tracks/{song_id}"
-    req = requests.get(
-        url,
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    if req.status_code != 200:
-        return None
+    req = request_with_retry("get", url, ses)
     data = req.json()
 
     return Song(
         songId=song_id,
         durationMs=int(data["duration_ms"]) or -1,
         title=data["name"],
-        artists=data["artists"],
+        artists=[a["name"] for a in data["artists"]],
         album=data["album"]["name"],
         coverUrl=data["album"]["images"][0]["url"],
     )
 
 @api.get("/search")
 async def get_songs(req: Request):
-    try:
-        ses = get_user_session(req.cookies)
-        access_token = ses.accessToken
-    except HTTPException:
-        return RedirectResponse("/login")
-
     query = req.query_params.get("q")
 
-    url = "https://api.spotify.com/v1/search/"
-    req = requests.get(
-        url,
-        params={
-            "q": query,
-            "type": "track",
-            "market": "US",
-        },
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    if req.status_code != 200:
-        raise HTTPException(req.status_code, req.reason)
+    url = "https://api.spotify.com/v1/search"
+    response = request_with_retry_using_req("get", url, req, {
+        "q": query,
+        "type": "track",
+        "market": "US",
+    })
 
-    tracks = req.json()["tracks"]["items"]
+    tracks = response.json()["tracks"]["items"]
 
     return [
         Song(
             songId=t["id"],
-            durationMs=int(t["duration_ms"]) or -1,
+            durationMs=t["duration_ms"] if "duration_ms" in t else -1,
             title=t["name"],
             artists=[a["name"] for a in t["artists"]],
             album=t["album"]["name"],
@@ -344,31 +496,8 @@ async def get_songs(req: Request):
         )
         for t in tracks
     ]
-    
-@api.put("/start_resume")
-async def play_song(req: Request):
-    try:
-        ses = get_user_session(req.cookies)
-        access_token = ses.accessToken
-    except HTTPException:
-        return RedirectResponse("/login")
-    
-    url = "https://api.spotify.com/v1/me/player/play"
-    req = requests.put(
-        url,
-        json = {
-            "uris":["spotify:track:42VsgItocQwOQC3XWZ8JNA", "spotify:track:66TRwr5uJwPt15mfFkzhbi"],
-            "offset": {"position": 0}
-        },
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
-        }
-    )
-    if req.status_code != 204:
-        raise HTTPException(req.status_code, req.reason)
-    return req
 
+# TODO: Delete
 @api.post("/spotify_queue")
 async def db_to_spot_queue(req: Request):
     try:
@@ -429,6 +558,29 @@ def set_interval(new_int):
     global interval_seconds
     interval_seconds = new_int
 
+# TODO: Delete
+@api.post("/db_to_spot_queue")
+def queue_song_for_user(req: Request):
+    url = "https://api.spotify.com/v1/me/player/queue"
+
+    res = request_with_retry_using_req("post", url, req, {
+        "uri": "spotify:track:6BJHsLiE47Sk0wQkuppqhr"
+    })
+
+    if res.status_code == 404:
+        pass # TODO: Rohan, remove user from active user list at this point
+    elif res.status_code != 204:
+        raise HTTPException(req.status_code, req.reason)
+    return res
+
+def get_user_by_uri(uri: str) -> UserSession:
+    ses_collection = db["sessions"]
+    user = ses_collection.find_one(
+        filter={"userUri": uri}
+    )
+    if user is None:
+        raise HTTPException(404, "User not found")
+    return UserSession.validate_model(user)
 
 @repeat_every(seconds=lambda: interval_seconds)
 def update_radio_queue():
@@ -439,16 +591,27 @@ def update_radio_queue():
     pool_collection.find_one_and_update(
         filter={"position": 0},
         update={
-            "position": None,
-            "poolJoinDT": None,
-            "votes": 0,
-            "lastPlayedDT": current_time,
+            "$set": {
+                "votes": 0,
+                "lastPlayedDT": current_time,
+            },
+            "$unset": {"poolJoinDT": "", "position": ""},
         },
     )
     pool_collection.update_many(
         filter={"position": {"$ne": None}},
         update={"$inc": {"position": -1}},
     )
+    
+    for userURI in connected_users:
+        url = "https://api.spotify.com/v1/me/player/queue"
+        trackID = pool_collection.find_one({"position": QUEUE_SIZE - 1})
+        res = request_with_retry("post", url, get_user_by_uri(userURI), {
+            "uri": f"spotify:track:{trackID}"
+        })
+        if res.status_code == 404:
+            connected_users.remove(userURI)
+    
     # get maximum position in queue
     pipeline = [
         {"$match": {"position": {"$ne": None}}},
@@ -468,14 +631,7 @@ def update_radio_queue():
             "votes": {"$gt": 0},
         }
     )
-    entries = [
-        PoolEntry(
-            votes=d["votes"],
-            lastPlayedTimestamp=d["lastPlayedDT"],
-            poolJoinTimestamp=d["poolJoinDT"],
-        )
-        for d in data
-    ]
+    entries = [PoolEntry.model_validate(d) for d in data]
     next_id = choose_next_song(entries)
     # add next song to end of queue
     pool_collection.find_one_and_update(

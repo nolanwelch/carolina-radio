@@ -6,7 +6,9 @@ export default function JoinSignInButton() {
   const isSignedIn: boolean = NetworkService.isLoggedIn();
 
   return isSignedIn ?
-    <Button variant="contained" startIcon={<PlayArrow />}>
+    <Button variant="contained" startIcon={<PlayArrow />} onClick={() => {
+      NetworkService.joinSession()
+    }}>
       Join Radio
     </Button>
     :

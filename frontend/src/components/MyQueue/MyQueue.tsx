@@ -18,7 +18,7 @@ export default function MyQueue() {
 
     return (
       <div className={styles.loggedInDisplay}>
-        <QueueSong />
+        <QueueSong addSong={(song: Song) => setRequestedSongs([...requestedSongs, song])}/>
         <Typography variant="h6">Your Requested Songs</Typography>
         <div className={styles.requestedSongsContainer}>
           {

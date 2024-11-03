@@ -23,6 +23,11 @@ const NetworkService = {
       withCredentials: true,
     })
   },
+  joinSession: function() {
+    return axios.post<Array<Song>>(process.env.REACT_APP_API_URL + "/join", {},{
+      withCredentials: true,
+    })
+  },
   getSearchSong: async function(query: string): Promise<Array<Song>> {
     return axios.get<Array<Song>>(process.env.REACT_APP_API_URL + "/search", {
       params: {
