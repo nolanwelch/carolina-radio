@@ -1,0 +1,28 @@
+.loggedOutDisplay {
+    display: flex;
+    flex-direction: column;
+
+    justify-content: center;
+    align-items: center;
+
+    gap: 2em;
+
+    height: 100%;
+
+    padding: 2em;
+}
+
+.loggedInDisplay {
+    display: flex;
+    flex-direction: column;
+
+    justify-content: flex-start;
+    align-items: center;
+    gap: 2em;
+}
+
+.requestedSongsContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}

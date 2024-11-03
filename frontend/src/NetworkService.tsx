@@ -1,14 +1,38 @@
-const BACKEND_BASE_URL: string = "http://localhost:1234/"; // TODO: update
+import Cookies from "js-cookie";
+import Song from "./types/Song";
+import axios, { AxiosResponse } from 'axios';
+import NowPlayingSong from "./types/NowPlayingSong";
 
 const NetworkService = {
-  getQueue: function() {
-
+  getNowPlaying: async function(): Promise<NowPlayingSong> {
+    const response = await axios.get<NowPlayingSong>(process.env.REACT_APP_API_URL + "/playing");
+    return response.data;
   },
-  postSong: function(songId: string) {
-
+  getQueue: async function(): Promise<Array<Song>> {
+    const response = await axios.get<Array<Song>>(process.env.REACT_APP_API_URL + "/queue");
+    return response.data;
   },
-  searchSong: function(query: string) {
-
+  getRequestedSongs: async function(): Promise<Array<Song>> {
+    const response = await axios.get<Array<Song>>(process.env.REACT_APP_API_URL + "/request", {
+      withCredentials: true,
+    });
+    return response.data;
+  },
+  requestSong: function(song: Song) {
+    return axios.post<Array<Song>>(process.env.REACT_APP_API_URL + "/request", {songId: song.songId},{
+      withCredentials: true,
+    })
+  },
+  getSearchSong: async function(query: string): Promise<Array<Song>> {
+    return axios.get<Array<Song>>(process.env.REACT_APP_API_URL + "/search", {
+      params: {
+        q: query
+      },
+      withCredentials: true,
+    }).then((response: AxiosResponse<Song[], any>) => response.data)
+  },
+  isLoggedIn: function(): boolean {
+    return Cookies.get("sessionId") ? true : false;
   }
 }
 

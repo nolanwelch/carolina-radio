@@ -1,0 +1,47 @@
+.card {
+    text-align: center;
+    width: min(600px, 80%);
+
+    margin: 0px auto 30px auto;
+}
+
+.cardContent {
+    display: flex;
+    flex-direction: row;
+}
+
+.songInformation {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin-left: 20px;
+    width: 100%;
+}
+
+.joinButton {
+    margin-top: auto;
+    margin-left: auto;
+}
+
+.albumCover { 
+    height: 100%;
+    width: 200px;
+}
+
+@media (max-width: 600px) {
+    .cardContent {
+        flex-direction: column;
+    }
+    .albumCover { 
+        width: 100px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .songInformation {
+        align-items: center;
+        margin-left: 0;
+    }
+    .joinButton {
+        margin-right: auto;
+    }
+}
