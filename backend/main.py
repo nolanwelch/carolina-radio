@@ -301,7 +301,7 @@ def get_song_data(song_id: str, access_token: str):
 
     return Song(
         songId=song_id,
-        durationMs=get_song_duration(song_id, access_token) or -1,
+        durationMs=int(data["duration_ms"]) or -1,
         title=data["name"],
         artists=data["artists"],
         album=data["album"]["name"],
@@ -336,7 +336,7 @@ async def get_songs(req: Request):
     return [
         Song(
             songId=t["id"],
-            durationMs=get_song_duration(t["id"], access_token),
+            durationMs=int(t["duration_ms"]) or -1,
             title=t["name"],
             artists=[a["name"] for a in t["artists"]],
             album=t["album"]["name"],
@@ -390,16 +390,6 @@ async def db_to_spot_queue(req: Request):
     if req.status_code != 204:
         raise HTTPException(req.status_code, req.reason)
     return req
-
-def get_song_duration(song_id: str, access_token: str):
-    url = f"https://api.spotify.com/v1/audio-features/{song_id}"
-    req = requests.get(
-        url,
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    if req.status_code != 200:
-        return None
-    return int(req.json()["duration_ms"])
 
 def now_playing():
     pool_collection = db["songPool"]
