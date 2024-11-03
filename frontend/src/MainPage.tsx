@@ -1,12 +1,12 @@
-import { Box, Button, CssBaseline, FormControl, FormControlLabel, FormLabel, IconButton, Radio, RadioGroup } from '@mui/material';
+import { Box, Button, CssBaseline, FormControl, FormControlLabel, FormLabel, IconButton, Radio, RadioGroup, Typography } from '@mui/material';
 import './App.css';
 import AppTabs from './components/AppTabs';
 import { createTheme, ThemeProvider, useColorScheme } from '@mui/material/styles';
 import SongPlaying from './components/SongPlaying/SongPlaying';
-import { DarkMode, LightMode } from '@mui/icons-material';
+import { DarkMode, Favorite, LightMode } from '@mui/icons-material';
 import Song from './types/Song';
 import NetworkService from './NetworkService';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import NowPlayingSong from './types/NowPlayingSong';
 import styles from "./MainPage.module.css";
 
@@ -22,15 +22,18 @@ export default function MainPage() {
     durationMs: 210000,
     votes: 0
   } as Song);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>()
 
   function updateQueue() {
     NetworkService.getQueue().then((songs: Song[]) => setQueuedSongs(songs));
   }
 
   function updateNowPlaying() {
+    updateQueue()
     NetworkService.getNowPlaying().then((nowPlaying: NowPlayingSong) => {
       setCurrentSong(nowPlaying);
-      setTimeout(updateNowPlaying, nowPlaying.durationMs - nowPlaying.position);
+      timeoutRef.current = setTimeout(updateNowPlaying, Math.max(500, nowPlaying.durationMs - nowPlaying.position));
+      console.log("Will update in " + Math.max(500, nowPlaying.durationMs - nowPlaying.position)/1000)
     }).catch(() => {
       setCurrentSong({
         songId: "",
@@ -45,8 +48,14 @@ export default function MainPage() {
   }
 
   useEffect(() => {
-    updateQueue();
     updateNowPlaying();
+    window.addEventListener("pageshow", () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      updateNowPlaying();
+    })
   }, [])
 
   if (!mode) {
@@ -56,7 +65,8 @@ export default function MainPage() {
   return (
     <>
       <CssBaseline />
-      <Box sx={{ position: "fixed", top: 12, right: 12 }}>
+      <Box className={styles.panel}>
+        <Typography variant="caption" className={styles.spotifyText}>Made with <Favorite sx={{ width: "16px", transform: "translate(0px, 8px)" }} /> using <img src="/spotify.png" width="16px" height="100%" style={{transform: "translate(0px, 4px)"}}/></Typography>
         {mode === "light" ?
           <IconButton onClick={() => setMode('dark')}>
             <LightMode />

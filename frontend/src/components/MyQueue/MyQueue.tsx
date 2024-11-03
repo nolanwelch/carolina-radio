@@ -11,14 +11,16 @@ export default function MyQueue() {
   const isSignedIn: boolean = NetworkService.isLoggedIn();
   const [requestedSongs, setRequestedSongs] = useState<Array<Song>>([]);
 
-  if (isSignedIn) {
-    useEffect(()=> {
+  useEffect(()=> {
+    if (isSignedIn) {
       NetworkService.getRequestedSongs().then((songs: Song[]) => setRequestedSongs(songs));
-    }, []);
+    }
+  }, []);
 
+  if (isSignedIn) {
     return (
       <div className={styles.loggedInDisplay}>
-        <QueueSong addSong={(song: Song) => setRequestedSongs([...requestedSongs, song])}/>
+        <QueueSong addSong={(song: Song) => {if (!requestedSongs.map((_song: Song) => _song.songId).includes(song.songId)) {setRequestedSongs([...requestedSongs, song])}}}/>
         <Typography variant="h6">Your Requested Songs</Typography>
         <div className={styles.requestedSongsContainer}>
           {

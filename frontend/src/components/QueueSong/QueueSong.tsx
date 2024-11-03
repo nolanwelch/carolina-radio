@@ -96,7 +96,13 @@ export default function QueueSong(props: {addSong: (song: Song) => void}) {
           );
         }}
       />
-      <Button size="large" variant="contained" startIcon={<AddIcon />} disabled={value == undefined} onClick={() => {if (value) {NetworkService.requestSong(value)}}}>
+      <Button size="large" variant="contained" startIcon={<AddIcon />} disabled={value == undefined} onClick={() => {
+        if (value) {
+          NetworkService.requestSong(value);
+          setValue(null);
+          props.addSong(value)
+        }
+        }}>
         Request Song
       </Button>
     </div>

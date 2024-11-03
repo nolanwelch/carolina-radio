@@ -24,7 +24,7 @@ const NetworkService = {
     })
   },
   joinSession: function() {
-    return axios.post<Array<Song>>(process.env.REACT_APP_API_URL + "/join", {},{
+    return axios.put<Array<Song>>(process.env.REACT_APP_API_URL + "/join", {},{
       withCredentials: true,
     })
   },
