@@ -4,6 +4,7 @@ import os
 import random
 from dataclasses import dataclass
 from urllib.parse import urlencode
+from uuid import uuid4
 
 import dotenv
 import numpy as np
@@ -45,10 +46,18 @@ class Song(BaseModel):
     durationMs: int
 
 
+class UserSession(BaseModel):
+    startDT: datetime
+    userUri: str
+    accessToken: str = None
+    refreshToken: str = None
+    sessionId: str = uuid4()
+
+
 class SongRequest(BaseModel):
     requestDT: datetime
     song: Song
-    userId: str
+    userUri: str
 
 
 class PoolEntry(BaseModel):
@@ -96,6 +105,20 @@ def choose_next_song(entries: PoolEntry):
     song_uri = np.random.choice(df["uri"], 1, p=df["probability"])[0]
     return str(song_uri)
 
+
+def get_user_session(cookies: dict[str, str]):
+    session_id = cookies.get("sessionId")
+    if session_id is not None:
+        ses_collection = db["sessions"]
+        session = UserSession(ses_collection.find_one({"sessionId": session_id}))
+        if (datetime.now() - session.startDT).total_seconds() > (60 * 60):
+            return HTTPException(status_code=401)
+
+        return session
+
+    return HTTPException(status_code=401)
+
+
 @api.get("/login")
 def read_root():
     state = generate_random_string(20)
@@ -121,7 +144,7 @@ def callback(request: Request, response: Response):
     state = request.query_params["state"]
     stored_state = request.cookies.get(os.environ.get("STATE_KEY"))
 
-    if state == None or state != stored_state:
+    if state is None or state != stored_state:
         raise HTTPException(status_code=400, detail="State mismatch")
     else:
 
@@ -166,13 +189,25 @@ def callback(request: Request, response: Response):
             if data["explicit_content"]["filter_locked"]:
                 return response
             
-            response.set_cookie(key="accessToken", value=access_token)
-            response.set_cookie(key="refreshToken", value=refresh_token)
+            ses_collection = db["sessions"]
+            session = UserSession(
+                startDT=datetime.now(),
+                userUri=data["uri"],
+                accessToken=access_token,
+                refreshToken=refresh_token,
+            )
+            ses_collection.insert_one(session)
+
+            response.set_cookie(key="sessionId", value=session.sessionId)
 
         return response
 
 def refresh_token(request: Request):
-    refresh_token = request.cookies.get("refreshToken")
+    try:
+        ses = get_user_session(request.cookies)
+        refresh_token = ses.refreshToken
+    except HTTPException:
+        return RedirectResponse("/login")
     request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
     encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
     encoded_string = str(encoded_bytes, "utf-8")
@@ -200,7 +235,11 @@ def refresh_token(request: Request):
 
 @api.post("/request")
 def create_request(request: Request):
-    access_token = request.cookies.get("accessToken")
+    try:
+        ses = get_user_session(request.cookies)
+        access_token = ses.accessToken
+    except HTTPException:
+        return RedirectResponse("/login")
 
     song_id = request.query_params.get("songId")
     songs_collection = db["songs"]
@@ -213,8 +252,7 @@ def create_request(request: Request):
 
     req_collection = db["requests"]
     song = songs_collection.find_one({"songId": song_id})
-    # TODO: Get user ID from request
-    new_req = SongRequest(datetime=datetime.now(), songId=song, userId=...)
+    new_req = SongRequest(datetime=datetime.now(), songId=song, userUri=ses.userUri)
     req_collection.insert_one(new_req)
 
     pool_collection = db["songPool"]
@@ -247,8 +285,13 @@ def get_song_data(song_id: str):
 
 @api.get("/search")
 def get_songs(req: Request):
+    try:
+        ses = get_user_session(req.cookies)
+        access_token = ses.accessToken
+    except HTTPException:
+        return RedirectResponse("/login")
+
     query = req.query_params.get("q")
-    access_token = req.cookies.get("accessToken")
 
     url = "https://api.spotify.com/v1/search/"
     req = requests.get(
@@ -279,7 +322,11 @@ def get_songs(req: Request):
     
 @api.put("/start_resume")
 def play_song(req: Request):
-    access_token = req.cookies.get("accessToken")
+    try:
+        ses = get_user_session(req.cookies)
+        access_token = ses.accessToken
+    except HTTPException:
+        return RedirectResponse("/login")
     
     url = "https://api.spotify.com/v1/me/player/play"
     req = requests.put(
@@ -299,7 +346,11 @@ def play_song(req: Request):
 
 @api.post("/spotify_queue")
 def db_to_spot_queue(req: Request):
-    access_token = req.cookies.get("accessToken")
+    try:
+        ses = get_user_session(req.cookies)
+        access_token, _ = ses.accessToken
+    except HTTPException:
+        return RedirectResponse("/login")
     
     url = "https://api.spotify.com/v1/me/player/queue"
     req = requests.post(
@@ -408,12 +459,3 @@ def update_radio_queue():
 
 
 update_radio_queue()
-
-
-def main():
-    votes = [UserVote(1, "test"), UserVote(1, "test2"), UserVote(2, "test3")]
-    # print(choose_next_song(votes))
-
-
-if __name__ == "__main__":
-    main()
