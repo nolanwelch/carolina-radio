@@ -8,6 +8,8 @@ from urllib.parse import urlencode
 import dotenv
 import numpy as np
 import pandas as pd
+from fastapi_restful.tasks import repeat_every
+from datetime import datetime
 import requests
 from pydantic import BaseModel
 from pymongo.mongo_client import MongoClient
@@ -34,25 +36,28 @@ api.add_middleware(
 dotenv.load_dotenv()
 
 
-@dataclass
-class UserVote:
-    tickets: int
-    uri: str
+class Song(BaseModel):
+    songId: str
+    artists: list[str]
+    album: str
+    title: str
+    coverUrl: str
+    durationMs: int
+
 
 class SongRequest(BaseModel):
-    datetime: str
-    songId: str
+    requestDT: datetime
+    song: Song
     userId: str
 
 
-class Song(BaseModel):
-    spotifyUri: str
-    lengthMs: int
-    title: str
-    artists: list[str]
-    album: str
-    coverUrl: str
-    
+class PoolEntry(BaseModel):
+    position: int = None
+    song: Song
+    startDT: datetime = None
+    votes: int
+    lastPlayedDT: datetime = None
+    poolJoinDT: datetime = None
 
 def get_db():
     uri = os.environ.get("MONGO_URI")
@@ -76,8 +81,11 @@ def get_ticket_count(n_votes, time_since_played_s, time_in_pool_s):
     )
 
 
-def choose_next_song(votes: UserVote):
-    df = pd.DataFrame(votes)
+def choose_next_song(entries: PoolEntry):
+    df = pd.DataFrame(entries)
+    curr_time = datetime.now()
+    df["timeSincePlayed"] = curr_time - df["lastPlayedDT"]
+    df["timeInPool"] = curr_time - df["poolJoinDT"]
     df["tickets"] = df.apply(
         lambda row: get_ticket_count(
             row["votes"], row["timeSincePlayed"], row["timeInPool"]
@@ -91,7 +99,7 @@ def choose_next_song(votes: UserVote):
 @api.get("/login")
 def read_root():
     state = generate_random_string(20)
-    scope = "user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing"
+    scope = "user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing user-read-email"
 
     params = {
         "response_type": "code",
@@ -121,7 +129,7 @@ def callback(request: Request, response: Response):
         request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
         encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
         encoded_string = str(encoded_bytes, "utf-8")
-        header = {
+        headers = {
             "content-type": "application/x-www-form-urlencoded",
             "Authorization": "Basic " + encoded_string
             }
@@ -132,14 +140,32 @@ def callback(request: Request, response: Response):
             "grant_type": "authorization_code",
         }
 
-        api_response = requests.post(url, data=form_data, headers=header)
+        api_response = requests.post(url, data=form_data, headers=headers)
 
         if api_response.status_code == 200:
             data = api_response.json()
             access_token = data["access_token"]
             refresh_token = data["refresh_token"]
-
+            
+            url = "https://api.spotify.com/v1/me"
+            req = requests.get(
+                url,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json"
+                }
+            )
+            if req.status_code != 200:
+                raise HTTPException(req.status_code, req.reason)
+            data = req.json()
             response = RedirectResponse(url=os.environ.get("URI"))
+            if data["product"] != "premium":
+                return response
+            if data["explicit_content"]["filter_enabled"]:
+                return response
+            if data["explicit_content"]["filter_locked"]:
+                return response
+            
             response.set_cookie(key="accessToken", value=access_token)
             response.set_cookie(key="refreshToken", value=refresh_token)
 
@@ -150,7 +176,7 @@ def refresh_token(request: Request):
     request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
     encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
     encoded_string = str(encoded_bytes, "utf-8")
-    header = {
+    headers = {
             "content-type": "application/x-www-form-urlencoded",
             "Authorization": "Basic " + encoded_string
             }
@@ -159,7 +185,7 @@ def refresh_token(request: Request):
 
     url = "https://accounts.spotify.com/api/token"
 
-    response = requests.post(url, data=form_data, headers=header)
+    response = requests.post(url, data=form_data, headers=headers)
     if response.status_code != 200:
         raise HTTPException(status_code=400, detail="Error with refresh token")
     else:
@@ -173,25 +199,38 @@ def refresh_token(request: Request):
 
 
 @api.post("/request")
-def create_request(request: SongRequest):
+def create_request(request: Request):
+    access_token = request.cookies.get("accessToken")
+
+    song_id = request.query_params.get("songId")
     songs_collection = db["songs"]
-    song_metadata = songs_collection.find_one({"spotifyId": request.songId})
+    song_metadata = songs_collection.find_one({"spotifyId": song_id})
     if not song_metadata:
-        data = get_song_data(request.songId)
-        if data is None:
-            return None
-        song_data = Song(
-            request.songId,
-            data["durationMs"],
-            data["name"],
-            data["artists"],
-            data["album"]["name"],
-            data["album"]["images"][0]["url"],
-        )
-        # insert song data to songs collection
-        songs_collection.insert_one(song_data)
+        song = get_song_data(song_id, access_token)
+        if song is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"Song {song_id} not found")
+        songs_collection.insert_one(song)
+
     req_collection = db["requests"]
-    req_collection.insert_one(request)
+    song = songs_collection.find_one({"songId": song_id})
+    # TODO: Get user ID from request
+    new_req = SongRequest(datetime=datetime.now(), songId=song, userId=...)
+    req_collection.insert_one(new_req)
+
+    pool_collection = db["songPool"]
+    pool_song = pool_collection.find_one({"songId": song_id})
+    if pool_song is None:
+        new_entry = PoolEntry(
+            song=song,
+            votes=1,
+            spotifyUri=song_id,
+            poolJoinDT=datetime.now(),
+        )
+        pool_collection.insert_one(new_entry)
+    else:
+        pool_collection.find_one_and_update(
+            {"song": song}, update={"votes": {"$inc": 1}}
+        )
 
 
 def get_song_data(song_id: str):
@@ -276,7 +315,6 @@ def db_to_spot_queue(req: Request):
         raise HTTPException(req.status_code, req.reason)
     return req
 
-
 def get_song_duration(song_id: str, access_token: str):
     url = f"https://api.spotify.com/v1/audio-features/{song_id}"
     req = requests.get(
@@ -286,6 +324,16 @@ def get_song_duration(song_id: str, access_token: str):
     if req.status_code != 200:
         return None
     return int(req.json()["duration_ms"])
+
+@api.get("/playing")
+def now_playing(req: Request):
+    pool_collection = db["songPool"]
+    curr_song = pool_collection.find_one({"position": 0})
+    if curr_song is None:
+        return Response(status_code=404)
+
+    seek_time_ms = datetime.now() - curr_song["startDT"]
+    return Response(content={"song": curr_song["song"], "seekMs": seek_time_ms})
 
 
 def generate_random_string(string_length):
@@ -297,6 +345,70 @@ def generate_random_string(string_length):
         ]
     )
     return text
+
+interval_seconds = 60
+
+
+def set_interval(new_int):
+    global interval_seconds
+    interval_seconds = new_int
+
+
+@repeat_every(seconds=lambda: interval_seconds)
+def update_radio_queue():
+    pool_collection = db["songPool"]
+
+    # pop from radio queue, move other songs up
+    current_time = datetime.now()
+    pool_collection.find_one_and_update(
+        filter={"position": 0},
+        update={
+            "position": None,
+            "poolJoinDT": None,
+            "votes": 0,
+            "lastPlayedDT": current_time,
+        },
+    )
+    pool_collection.update_many(
+        filter={"position": {"$ne": None}},
+        update={"$inc": {"position": -1}},
+    )
+    # get maximum position in queue
+    pipeline = [
+        {"$match": {"position": {"$ne": None}}},
+        {"$group": {"_id": None, "max_value": {"$max": "$position"}}},
+    ]
+    positions = list(pool_collection.aggregate(pipeline))
+    max_pos = int(positions[0]) if positions else 0
+
+    # update wait time to match new top of queue
+    current_song = pool_collection.find_one({"position": 0})
+    set_interval(current_song["durationMs"] // 1000)
+
+    # choose next song via raffle method
+    data = pool_collection.find(
+        {
+            "position": {"$eq": None},
+            "votes": {"$gt": 0},
+        }
+    )
+    entries = [
+        PoolEntry(
+            votes=d["votes"],
+            lastPlayedTimestamp=d["lastPlayedDT"],
+            poolJoinTimestamp=d["poolJoinDT"],
+        )
+        for d in data
+    ]
+    next_id = choose_next_song(entries)
+    # add next song to end of queue
+    pool_collection.find_one_and_update(
+        filter={"songId": next_id}, update={"position": max_pos}
+    )
+
+
+update_radio_queue()
+
 
 def main():
     votes = [UserVote(1, "test"), UserVote(1, "test2"), UserVote(2, "test3")]
