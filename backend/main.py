@@ -47,6 +47,7 @@ async def queue_updater():
     try:
         while True:
             sleep_s = await update_radio_queue()
+            print("Sleeping")
             await asyncio.sleep(sleep_s)
     except asyncio.CancelledError:
         pass
@@ -88,21 +89,15 @@ async def update_radio_queue():
         update={"$inc": {"position": -1}},
     )
 
+    print(connected_users)
+    
     for userURI in connected_users:
-        try:
-            url = "https://api.spotify.com/v1/me/player/queue"
-            requests.post(
-                url,
-                params={
-                    "uri": f"spotify:track:{pool_collection.find_one({'position': 2})}"
-                },
-                headers={
-                    "Authorization": f"Bearer {get_user_by_uri(userURI).accessToken}"
-                },
-            )
-        except Exception as e:
-            print(e)
-            connected_users.remove(userURI)
+        url = "https://api.spotify.com/v1/me/player/queue"
+        print(get_user_by_uri(userURI).accessToken)
+        print(pool_collection.find_one({'position': 2}))
+        resp = request_with_retry("POST", url, get_user_by_uri(userURI), {
+                "uri": f"spotify:track:{pool_collection.find_one({'position': 2})['song']['songId']}"})
+        print(resp.status_code)
 
     # get maximum position in queue
     pipeline = [
@@ -219,6 +214,7 @@ def request_with_retry_using_req(
 
 
 def _do_request(mode: str, url: str, accessToken: str, params: dict = {}) -> Response:
+    print(mode, url, params, accessToken)
     return requests.request(
         mode.upper(),
         url,
@@ -408,18 +404,22 @@ def connect(req: Request):
         params={"uri": f"spotify:track:{songs[0].songId}"},
         headers={"Authorization": f"Bearer {access_token}"},
     )
-    if req.status_code != 204:
+    print("test1", req.status_code, access_token)
+    if req.status_code != 200:
         raise HTTPException(req.status_code, req.reason)
     req = requests.post(
         url,
         params={"uri": f"spotify:track:{songs[1].songId}"},
         headers={"Authorization": f"Bearer {access_token}"},
     )
-    if req.status_code != 204:
+    print("test2")
+    if req.status_code != 200:
         raise HTTPException(req.status_code, req.reason)
     if ses.userUri not in connected_users:
         connected_users.append(ses.userUri)
-    return req
+    print(ses.userUri)
+    print("------------")
+    print(connected_users)
     
 
 # TODO: implement properly
