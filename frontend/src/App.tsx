@@ -1,27 +1,28 @@
-import { CssBaseline } from '@mui/material';
 import './App.css';
-import AppTabs from './components/AppTabs';
-import SongPlaying from './components/SongPlaying';
-import { createTheme, ThemeOptions, ThemeProvider } from '@mui/material/styles';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+import MainPage from './MainPage';
 
 const theme = createTheme({
+  colorSchemes: {
+    dark: true
+  },
   palette: {
-    mode: 'dark',
     primary: {
       main: '#7BAFD4',
     },
     secondary: {
       main: '#C4D600',
     },
+    background: {
+      paper: '#EEEEEE'
+    }
   },
 });
 
 function App() {
   return (
     <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <SongPlaying />
-      <AppTabs />
+      <MainPage/>
     </ThemeProvider>
   );
 }
