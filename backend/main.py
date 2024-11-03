@@ -81,6 +81,7 @@ N_VOTES_BIAS = 3
 TIME_SINCE_PLAYED_BIAS = 1e-3
 TIME_IN_POOL_BIAS = 1e-4
 
+connected_users = []
 
 def get_ticket_count(n_votes, time_since_played_s, time_in_pool_s):
     return (
@@ -206,6 +207,18 @@ async def callback(request: Request, response: Response):
             response.set_cookie(key="sessionId", value=session.sessionId)
 
         return response
+    
+@api.post("/join")
+def connect(req: Request):
+    try:
+        ses = get_user_session(req.cookies)
+        
+        # catch up to queue
+        
+        connected_users.append(ses.userUri)
+    except HTTPException:
+        return RedirectResponse("/login")
+    
 
 def refresh_token(request: Request):
     try:
@@ -453,11 +466,16 @@ def queue_song_for_user(req: Request):
         raise HTTPException(req.status_code, req.reason)
     return req
 
+def get_user_by_uri(uri: str):
+    ses_collection = db["sessions"]
+    user = ses_collection.find_one(
+        filter={"userUri": uri}
+    )
+    return user
+
 @repeat_every(seconds=lambda: interval_seconds)
 def update_radio_queue():
     pool_collection = db["songPool"]
-    ses_collection = db["sessions"]
-    userSessions = ses_collection.find()
 
     # pop from radio queue, move other songs up
     current_time = datetime.now()
@@ -475,7 +493,7 @@ def update_radio_queue():
         update={"$inc": {"position": -1}},
     )
     
-    for ses in userSessions:
+    for userURI in connected_users:
         try:
             url = "https://api.spotify.com/v1/me/player/queue"
             requests.post(
@@ -484,11 +502,11 @@ def update_radio_queue():
                     "uri": f"spotify:track:{pool_collection.find_one({"position": 2})}"
                 },
                 headers={
-                    "Authorization": f"Bearer {ses["accessToken"]}"
+                    "Authorization": f"Bearer {get_user_by_uri(userURI)["accessToken"]}"
                 }
             )
         except:
-            ses_collection.delete_one(ses)
+            connected_users.remove(userURI)
     
     # get maximum position in queue
     pipeline = [
