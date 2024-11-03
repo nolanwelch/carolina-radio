@@ -252,8 +252,8 @@ def create_request(request: Request):
 
     req_collection = db["requests"]
     song = songs_collection.find_one({"songId": song_id})
-    new_req = SongRequest(datetime=datetime.now(), songId=song, userUri=ses.userUri)
-    req_collection.insert_one(new_req)
+    new_req = SongRequest(requestDT=datetime.now(), songId=song, userUri=ses.userUri)
+    req_collection.insert_one(new_req.model_dump())
 
     pool_collection = db["songPool"]
     pool_song = pool_collection.find_one({"songId": song_id})
