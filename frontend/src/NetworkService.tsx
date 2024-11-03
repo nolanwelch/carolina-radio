@@ -1,3 +1,4 @@
+import Cookies from "js-cookie";
 import Song from "./types/Song";
 import axios, { AxiosResponse } from 'axios';
 
@@ -17,6 +18,9 @@ const NetworkService = {
     }
 
     ).then((response: AxiosResponse<Song[], any>) => response.data)
+  },
+  isLoggedIn: function(): boolean {
+    return Cookies.get("accessToken") ? true : false;
   }
 }
 
