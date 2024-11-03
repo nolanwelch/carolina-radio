@@ -97,7 +97,7 @@ async def update_radio_queue():
                     "uri": f"spotify:track:{pool_collection.find_one({'position': QUEUE_SIZE - 1})}"
                 },
                 headers={
-                    "Authorization": f"Bearer {get_user_by_uri(userURI)['accessToken']}"
+                    "Authorization": f"Bearer {get_user_by_uri(userURI).accessToken}"
                 },
             )
         except:
@@ -396,7 +396,7 @@ def connect(req: Request):
     req = requests.put(
         url,
         json = {
-            "uris": [f"spotify:track:{currentSong.songId}"] + [f"spotify:track:{s.songId}" for s in songs[:min(len(songs), 2)]],
+            "uris": [f"spotify:track:{currentSong.songId}"],
             "position_ms": int(pos_ms)
         },
         headers={
@@ -406,7 +406,24 @@ def connect(req: Request):
     )
     if req.status_code != 204:
         raise HTTPException(req.status_code, req.reason)
-    connected_users.append(ses.userUri)
+    print(songs)
+    url = "https://api.spotify.com/v1/me/player/queue"
+    req = requests.post(
+        url,
+        params={"uri": f"spotify:track:{songs[0].songId}"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    if req.status_code != 204:
+        raise HTTPException(req.status_code, req.reason)
+    req = requests.post(
+        url,
+        params={"uri": f"spotify:track:{songs[1].songId}"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    if req.status_code != 204:
+        raise HTTPException(req.status_code, req.reason)
+    if ses.userUri not in connected_users:
+        connected_users.append(ses.userUri)
     return req
     
 
