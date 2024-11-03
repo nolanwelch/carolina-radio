@@ -13,7 +13,7 @@ export default function MainPage() {
   const { mode, setMode, systemMode } = useColorScheme();
   const [queuedSongs, setQueuedSongs] = useState<Array<Song>>([]);
   const [currentSong, setCurrentSong] = useState<Song>({
-    spotifyUri: "",
+    songId: "",
     title: "Nothing!",
     artists: ["Nobody"],
     album: "No Album",
@@ -32,7 +32,7 @@ export default function MainPage() {
       setTimeout(updateNowPlaying, nowPlaying.lengthMs - nowPlaying.position);
     }).catch(() => {
       setCurrentSong({
-        spotifyUri: "",
+        songId: "",
         title: "Nothing!",
         artists: ["Nobody"],
         album: "No Album",

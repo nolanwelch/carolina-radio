@@ -50,7 +50,7 @@ export default function QueueSong() {
         size="medium"
         forcePopupIcon={false}
         getOptionLabel={(option) =>
-          typeof option === 'string' ? option : option.title
+          typeof option === 'string' ? option : option.songId
         }
         filterOptions={(x) => x}
         options={options}
@@ -63,7 +63,6 @@ export default function QueueSong() {
           console.log(newValue)
         }}
         onInputChange={(event, newInputValue) => {
-          console.log("ic")
           setInputValue(newInputValue);
         }}
         renderInput={(params) => (

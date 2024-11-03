@@ -24,7 +24,7 @@ export default function MyQueue() {
           {
             requestedSongs.length > 0 ? 
             requestedSongs.map((requestedSong: Song) => {
-              return <SongDisplay key={requestedSong.spotifyUri} song={requestedSong} />
+              return <SongDisplay key={requestedSong.songId} song={requestedSong} />
             })
             :
             <Typography variant="body1">You don't have any songs waiting.</Typography>

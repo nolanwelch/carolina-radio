@@ -19,7 +19,7 @@ const NetworkService = {
     return response.data;
   },
   requestSong: function(song: Song) {
-    return axios.post<Array<Song>>(process.env.REACT_APP_API_URL + "/request", {id: song.spotifyUri},{
+    return axios.post<Array<Song>>(process.env.REACT_APP_API_URL + "/request", {id: song.songId},{
       withCredentials: true,
     })
   },
