@@ -324,13 +324,57 @@ async def callback(request: Request, response: Response):
 def connect(req: Request):
     try:
         ses = get_user_session(req.cookies)
-        
-        # catch up to queue
-        
-        connected_users.append(ses.userUri)
+        access_token = ses.accessToken
     except HTTPException:
         return RedirectResponse("/login")
     
+    # Catch up to queue
+    url = "https://api.spotify.com/v1/me/player/play"
+    songs = get_queue()
+    currentSong, pos_ms = now_playing()
+    req = requests.put(
+        url,
+        json = {
+            "uris":[f"spotify:track:{songs[0]}", f"spotify:track:{songs[1]}", f"spotify:track:{songs[2]}"],
+            "position_ms": pos_ms
+        },
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+    )
+    if req.status_code != 204:
+        raise HTTPException(req.status_code, req.reason)
+    
+    # Add to connected users
+    connected_users.append(ses.userUri)
+    
+# TODO: Delete once implemented into join
+@api.put("/start_resume")
+async def play_song(req: Request):
+    try:
+        ses = get_user_session(req.cookies)
+        access_token = ses.accessToken
+    except HTTPException:
+        return RedirectResponse("/login")
+    
+    url = "https://api.spotify.com/v1/me/player/play"
+    songs = get_queue()
+    currentSong, pos_ms = now_playing()
+    req = requests.put(
+        url,
+        json = {
+            "uris":[f"spotify:track:{songs[0]}", f"spotify:track:{songs[1]}", f"spotify:track:{songs[2]}"],
+            "position_ms": pos_ms
+        },
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+    )
+    if req.status_code != 204:
+        raise HTTPException(req.status_code, req.reason)
+    return req
 
 # TODO: implement properly
 def refresh_token(ses: UserSession):
@@ -452,33 +496,6 @@ async def get_songs(req: Request):
         )
         for t in tracks
     ]
-    
-# TODO: Delete
-@api.put("/start_resume")
-async def play_song(req: Request):
-    try:
-        ses = get_user_session(req.cookies)
-        access_token = ses.accessToken
-    except HTTPException:
-        return RedirectResponse("/login")
-    
-    url = "https://api.spotify.com/v1/me/player/play"
-    songs = get_queue()
-    currentSong, pos_ms = now_playing()
-    req = requests.put(
-        url,
-        json = {
-            "uris":[f"spotify:track:{songs[0]}", f"spotify:track:{songs[1]}", f"spotify:track:{songs[2]}"],
-            "position_ms": pos_ms
-        },
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
-        }
-    )
-    if req.status_code != 204:
-        raise HTTPException(req.status_code, req.reason)
-    return req
 
 # TODO: Delete
 @api.post("/spotify_queue")
