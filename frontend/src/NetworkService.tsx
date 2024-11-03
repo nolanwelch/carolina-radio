@@ -12,7 +12,7 @@ const NetworkService = {
   getSearchSong: async function(query: string): Promise<Array<Song>> {
     return axios.get<Array<Song>>(process.env.REACT_APP_API_URL + "/search", {
       params: {
-        query: query
+        q: query
       },
       withCredentials: true,
     }
