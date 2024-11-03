@@ -94,13 +94,14 @@ async def update_radio_queue():
             requests.post(
                 url,
                 params={
-                    "uri": f"spotify:track:{pool_collection.find_one({'position': QUEUE_SIZE - 1})}"
+                    "uri": f"spotify:track:{pool_collection.find_one({'position': 2})}"
                 },
                 headers={
                     "Authorization": f"Bearer {get_user_by_uri(userURI).accessToken}"
                 },
             )
-        except:
+        except Exception as e:
+            print(e)
             connected_users.remove(userURI)
 
     # get maximum position in queue
@@ -110,12 +111,6 @@ async def update_radio_queue():
     ]
     positions = list(pool_collection.aggregate(pipeline))
     max_pos = int(positions[0]["max_value"]) if positions else 0
-
-    # update wait time to match new top of queue
-    result = pool_collection.find_one({"position": 0})
-    if result is not None:
-        current_song = PoolEntry.model_validate(result)
-        set_interval(current_song.song.durationMs // 1000)
 
     # choose next song via raffle method
     data = pool_collection.find(
@@ -686,7 +681,7 @@ def get_user_by_uri(uri: str) -> UserSession:
     user = ses_collection.find_one(filter={"userUri": uri})
     if user is None:
         raise HTTPException(404, "User not found")
-    return UserSession.validate_model(user)
+    return UserSession.model_validate(user)
 
 
 def get_queue():
