@@ -199,25 +199,38 @@ def refresh_token(request: Request):
 
 
 @api.post("/request")
-def create_request(request: SongRequest):
+def create_request(request: Request):
+    access_token = request.cookies.get("accessToken")
+
+    song_id = request.query_params.get("songId")
     songs_collection = db["songs"]
-    song_metadata = songs_collection.find_one({"spotifyId": request.songId})
+    song_metadata = songs_collection.find_one({"spotifyId": song_id})
     if not song_metadata:
-        data = get_song_data(request.songId)
-        if data is None:
-            return None
-        song_data = Song(
-            request.songId,
-            data["durationMs"],
-            data["name"],
-            data["artists"],
-            data["album"]["name"],
-            data["album"]["images"][0]["url"],
-        )
-        # insert song data to songs collection
-        songs_collection.insert_one(song_data)
+        song = get_song_data(song_id, access_token)
+        if song is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"Song {song_id} not found")
+        songs_collection.insert_one(song)
+
     req_collection = db["requests"]
-    req_collection.insert_one(request)
+    song = songs_collection.find_one({"songId": song_id})
+    # TODO: Get user ID from request
+    new_req = SongRequest(datetime=datetime.now(), songId=song, userId=...)
+    req_collection.insert_one(new_req)
+
+    pool_collection = db["songPool"]
+    pool_song = pool_collection.find_one({"songId": song_id})
+    if pool_song is None:
+        new_entry = PoolEntry(
+            song=song,
+            votes=1,
+            spotifyUri=song_id,
+            poolJoinDT=datetime.now(),
+        )
+        pool_collection.insert_one(new_entry)
+    else:
+        pool_collection.find_one_and_update(
+            {"song": song}, update={"votes": {"$inc": 1}}
+        )
 
 
 def get_song_data(song_id: str):
