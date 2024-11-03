@@ -101,7 +101,7 @@ def choose_next_song(entries: PoolEntry):
 @api.get("/login")
 def read_root():
     state = generate_random_string(20)
-    scope = "user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing"
+    scope = "user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing user-read-email"
 
     params = {
         "response_type": "code",
@@ -131,7 +131,7 @@ def callback(request: Request, response: Response):
         request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
         encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
         encoded_string = str(encoded_bytes, "utf-8")
-        header = {
+        headers = {
             "content-type": "application/x-www-form-urlencoded",
             "Authorization": "Basic " + encoded_string
             }
@@ -142,14 +142,32 @@ def callback(request: Request, response: Response):
             "grant_type": "authorization_code",
         }
 
-        api_response = requests.post(url, data=form_data, headers=header)
+        api_response = requests.post(url, data=form_data, headers=headers)
 
         if api_response.status_code == 200:
             data = api_response.json()
             access_token = data["access_token"]
             refresh_token = data["refresh_token"]
-
+            
+            url = "https://api.spotify.com/v1/me"
+            req = requests.get(
+                url,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json"
+                }
+            )
+            if req.status_code != 200:
+                raise HTTPException(req.status_code, req.reason)
+            data = req.json()
             response = RedirectResponse(url=os.environ.get("URI"))
+            if data["product"] != "premium":
+                return response
+            if data["explicit_content"]["filter_enabled"]:
+                return response
+            if data["explicit_content"]["filter_locked"]:
+                return response
+            
             response.set_cookie(key="accessToken", value=access_token)
             response.set_cookie(key="refreshToken", value=refresh_token)
 
@@ -160,7 +178,7 @@ def refresh_token(request: Request):
     request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
     encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
     encoded_string = str(encoded_bytes, "utf-8")
-    header = {
+    headers = {
             "content-type": "application/x-www-form-urlencoded",
             "Authorization": "Basic " + encoded_string
             }
@@ -169,7 +187,7 @@ def refresh_token(request: Request):
 
     url = "https://accounts.spotify.com/api/token"
 
-    response = requests.post(url, data=form_data, headers=header)
+    response = requests.post(url, data=form_data, headers=headers)
     if response.status_code != 200:
         raise HTTPException(status_code=400, detail="Error with refresh token")
     else:
@@ -285,7 +303,6 @@ def db_to_spot_queue(req: Request):
     if req.status_code != 204:
         raise HTTPException(req.status_code, req.reason)
     return req
-
 
 def get_song_duration(song_id: str, access_token: str):
     url = f"https://api.spotify.com/v1/audio-features/{song_id}"
