@@ -114,11 +114,11 @@ def get_user_session(cookies: dict[str, str]):
             ses_collection.find_one({"sessionId": session_id})
         )
         if (datetime.now() - session.startDT).total_seconds() > (60 * 60):
-            return HTTPException(status_code=401)
+            raise HTTPException(status_code=401)
 
         return session
 
-    return HTTPException(status_code=401)
+    raise HTTPException(status_code=401)
 
 
 @api.get("/login")
