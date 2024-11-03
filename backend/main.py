@@ -10,7 +10,7 @@ import dotenv
 import numpy as np
 import pandas as pd
 from fastapi_restful.tasks import repeat_every
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 from pydantic import BaseModel
 from pymongo.mongo_client import MongoClient
@@ -51,7 +51,7 @@ class UserSession(BaseModel):
     userUri: str
     accessToken: str = None
     refreshToken: str = None
-    sessionId: str = uuid4()
+    sessionId: str = str(uuid4())
 
 
 class SongRequest(BaseModel):
@@ -110,13 +110,15 @@ def get_user_session(cookies: dict[str, str]):
     session_id = cookies.get("sessionId")
     if session_id is not None:
         ses_collection = db["sessions"]
-        session = UserSession(ses_collection.find_one({"sessionId": session_id}))
+        session = UserSession.model_validate(
+            ses_collection.find_one({"sessionId": session_id})
+        )
         if (datetime.now() - session.startDT).total_seconds() > (60 * 60):
-            return HTTPException(status_code=401)
+            raise HTTPException(status_code=401)
 
         return session
 
-    return HTTPException(status_code=401)
+    raise HTTPException(status_code=401)
 
 
 @api.get("/login")
@@ -135,6 +137,9 @@ def read_root():
         url="https://accounts.spotify.com/authorize?" + urlencode(params)
     )
     response.set_cookie(key=os.environ.get("STATE_KEY"), value=state)
+    response.set_cookie(
+        "sessionId",
+    )
     return response
 
 @api.get("/callback")
@@ -196,7 +201,7 @@ def callback(request: Request, response: Response):
                 accessToken=access_token,
                 refreshToken=refresh_token,
             )
-            ses_collection.insert_one(session)
+            ses_collection.insert_one(session.model_dump())
 
             response.set_cookie(key="sessionId", value=session.sessionId)
 
@@ -252,8 +257,8 @@ def create_request(request: Request):
 
     req_collection = db["requests"]
     song = songs_collection.find_one({"songId": song_id})
-    new_req = SongRequest(datetime=datetime.now(), songId=song, userUri=ses.userUri)
-    req_collection.insert_one(new_req)
+    new_req = SongRequest(requestDT=datetime.now(), songId=song, userUri=ses.userUri)
+    req_collection.insert_one(new_req.model_dump())
 
     pool_collection = db["songPool"]
     pool_song = pool_collection.find_one({"songId": song_id})
@@ -278,10 +283,14 @@ def get_song_data(song_id: str):
         return None
     data = req.json()
 
-    data["durationMs"] = get_song_duration(song_id)
-
-    return data
-
+    return Song(
+        songId=song_id,
+        durationMs=get_song_duration(song_id, access_token) or -1,
+        title=data["name"],
+        artists=data["artists"],
+        album=data["album"]["name"],
+        coverUrl=data["album"]["images"][0]["url"],
+    )
 
 @api.get("/search")
 def get_songs(req: Request):
@@ -310,8 +319,8 @@ def get_songs(req: Request):
 
     return [
         Song(
-            spotifyUri=t["id"],
-            lengthMs=get_song_duration(t["id"], access_token),
+            songId=t["id"],
+            durationMs=get_song_duration(t["id"], access_token),
             title=t["name"],
             artists=[a["name"] for a in t["artists"]],
             album=t["album"]["name"],
@@ -383,8 +392,8 @@ def now_playing(req: Request):
     if curr_song is None:
         return Response(status_code=404)
 
-    seek_time_ms = datetime.now() - curr_song["startDT"]
-    return Response(content={"song": curr_song["song"], "seekMs": seek_time_ms})
+    pos_ms = (datetime.now() - curr_song["startDT"]) / timedelta(milliseconds=1)
+    return Response(content={"song": curr_song["song"], "position": pos_ms})
 
 
 def generate_random_string(string_length):
