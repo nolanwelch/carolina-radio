@@ -81,6 +81,33 @@ N_VOTES_BIAS = 3
 TIME_SINCE_PLAYED_BIAS = 1e-3
 TIME_IN_POOL_BIAS = 1e-4
 
+def request_with_retry(mode: str, url: str, req: Request, params: dict = {}):
+    try:
+        ses = get_user_session(req.cookies)
+    except HTTPException:
+        return RedirectResponse("/login")
+    request_with_retry(mode, url, params, ses)
+
+
+def _do_request(mode: str, url: str, accessToken: str, params: dict = {}):
+    return requests.request(
+        mode,
+        url,
+        params=params,
+        headers={"Authorization": f"Bearer {accessToken}"},
+    )
+
+def request_with_retry(mode: str, url: str, ses: UserSession, params: dict = {}):
+    response = _do_request(mode, url, params, ses.accessToken)
+    if response.status_code == 401:
+        refresh_token(ses)
+        response = _do_request(mode, url, params, get_user_by_uri(ses.userUri).accessToken)
+    
+    if response.status_code != 200:
+        raise HTTPException(response.status_code, response.reason)
+    
+    return response
+
 connected_users = []
 
 def get_ticket_count(n_votes, time_since_played_s, time_in_pool_s):
@@ -220,12 +247,8 @@ def connect(req: Request):
         return RedirectResponse("/login")
     
 
-def refresh_token(request: Request):
-    try:
-        ses = get_user_session(request.cookies)
-        refresh_token = ses.refreshToken
-    except HTTPException:
-        return RedirectResponse("/login")
+# TODO: implement properly
+def refresh_token(ses: UserSession):
     request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
     encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
     encoded_string = str(encoded_bytes, "utf-8")
@@ -243,12 +266,17 @@ def refresh_token(request: Request):
         raise HTTPException(status_code=400, detail="Error with refresh token")
     else:
         data = response.json()
-        access_token = data["access_token"]
-        response = HTMLResponse()
-        response.set_cookie(key="accessToken",value=access_token)
+        updates = {
+            "accessToken": data["access_token"],
+        }
         if "refresh_token" in data:
-            response.set_cookie(key="refreshToken",value=data["refresh_token"])
-        return response
+            updates["refreshToken"] = data["refresh_token"]
+        
+        user_collection = db["sessions"]
+
+        user_collection.find_one_and_update(
+            {"userUri": ses.userUri}, update=updates
+        )
 
 
 @api.get("/request")
@@ -267,7 +295,6 @@ async def get_user_requests(request: Request) -> list[Song]:
 async def create_request(request: Request):
     try:
         ses = get_user_session(request.cookies)
-        access_token = ses.accessToken
     except HTTPException:
         return RedirectResponse("/login")
 
@@ -276,7 +303,7 @@ async def create_request(request: Request):
     songs_collection = db["songs"]
     song_metadata = songs_collection.find_one({"songId": song_id})
     if not song_metadata:
-        song = get_song_data(song_id, access_token)
+        song = get_song_data(song_id, ses)
         if song is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"Song {song_id} not found")
         songs_collection.insert_one(song.model_dump())
@@ -302,14 +329,9 @@ async def create_request(request: Request):
         )
 
 
-def get_song_data(song_id: str, access_token: str):
+def get_song_data(song_id: str, ses: UserSession):
     url = f"https://api.spotify.com/v1/tracks/{song_id}"
-    req = requests.get(
-        url,
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    if req.status_code != 200:
-        return None
+    req = request_with_retry("get", url, ses)
     data = req.json()
 
     return Song(
@@ -323,28 +345,16 @@ def get_song_data(song_id: str, access_token: str):
 
 @api.get("/search")
 async def get_songs(req: Request):
-    try:
-        ses = get_user_session(req.cookies)
-        access_token = ses.accessToken
-    except HTTPException:
-        return RedirectResponse("/login")
-
     query = req.query_params.get("q")
 
     url = "https://api.spotify.com/v1/search/"
-    req = requests.get(
-        url,
-        params={
-            "q": query,
-            "type": "track",
-            "market": "US",
-        },
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    if req.status_code != 200:
-        raise HTTPException(req.status_code, req.reason)
+    response = request_with_retry("get", url, req, {
+        "q": query,
+        "type": "track",
+        "market": "US",
+    })
 
-    tracks = req.json()["tracks"]["items"]
+    tracks = response.json()["tracks"]["items"]
 
     return [
         Song(
@@ -358,6 +368,7 @@ async def get_songs(req: Request):
         for t in tracks
     ]
     
+# TODO: Delete
 @api.put("/start_resume")
 async def play_song(req: Request):
     try:
@@ -384,6 +395,7 @@ async def play_song(req: Request):
         raise HTTPException(req.status_code, req.reason)
     return req
 
+# TODO: Delete
 @api.post("/spotify_queue")
 async def db_to_spot_queue(req: Request):
     try:
@@ -444,34 +456,29 @@ def set_interval(new_int):
     global interval_seconds
     interval_seconds = new_int
 
+# TODO: Delete
 @api.post("/db_to_spot_queue")
 def queue_song_for_user(req: Request):
-    try:
-        ses = get_user_session(req.cookies)
-        access_token = ses.accessToken
-    except HTTPException:
-        return RedirectResponse("/login")
-    
     url = "https://api.spotify.com/v1/me/player/queue"
-    req = requests.post(
-        url,
-        params = {
-            "uri": "spotify:track:6BJHsLiE47Sk0wQkuppqhr"
-        },
-        headers={
-            "Authorization": f"Bearer {access_token}"
-        }
-    )
-    if req.status_code != 204:
-        raise HTTPException(req.status_code, req.reason)
-    return req
 
-def get_user_by_uri(uri: str):
+    res = request_with_retry("post", url, req, {
+        "uri": "spotify:track:6BJHsLiE47Sk0wQkuppqhr"
+    })
+
+    if res.status_code == 404:
+        pass # TODO: Rohan, remove user from active user list at this point
+    elif res.status_code != 204:
+        raise HTTPException(req.status_code, req.reason)
+    return res
+
+def get_user_by_uri(uri: str) -> UserSession:
     ses_collection = db["sessions"]
     user = ses_collection.find_one(
         filter={"userUri": uri}
     )
-    return user
+    if user is None:
+        raise HTTPException(404, "User not found")
+    return UserSession.validate_model(user)
 
 @repeat_every(seconds=lambda: interval_seconds)
 def update_radio_queue():
@@ -494,18 +501,11 @@ def update_radio_queue():
     )
     
     for userURI in connected_users:
-        try:
-            url = "https://api.spotify.com/v1/me/player/queue"
-            requests.post(
-                url,
-                params = {
-                    "uri": f"spotify:track:{pool_collection.find_one({"position": 2})}"
-                },
-                headers={
-                    "Authorization": f"Bearer {get_user_by_uri(userURI)["accessToken"]}"
-                }
-            )
-        except:
+        url = "https://api.spotify.com/v1/me/player/queue"
+        res = request_with_retry("post", url, get_user_by_uri(userURI)["accessToken"], {
+            "uri": f"spotify:track:{pool_collection.find_one({"position": 2})}"
+        })
+        if res.status_code == 404:
             connected_users.remove(userURI)
     
     # get maximum position in queue
