@@ -298,6 +298,70 @@ def generate_random_string(string_length):
     )
     return text
 
+interval_seconds = 60
+
+
+def set_interval(new_int):
+    global interval_seconds
+    interval_seconds = new_int
+
+
+@repeat_every(seconds=lambda: interval_seconds)
+def update_radio_queue():
+    pool_collection = db["songPool"]
+
+    # pop from radio queue, move other songs up
+    current_time = datetime.now()
+    pool_collection.find_one_and_update(
+        filter={"position": 0},
+        update={
+            "position": None,
+            "poolJoinDT": None,
+            "votes": 0,
+            "lastPlayedDT": current_time,
+        },
+    )
+    pool_collection.update_many(
+        filter={"position": {"$ne": None}},
+        update={"$inc": {"position": -1}},
+    )
+    # get maximum position in queue
+    pipeline = [
+        {"$match": {"position": {"$ne": None}}},
+        {"$group": {"_id": None, "max_value": {"$max": "$position"}}},
+    ]
+    positions = list(pool_collection.aggregate(pipeline))
+    max_pos = int(positions[0]) if positions else 0
+
+    # update wait time to match new top of queue
+    current_song = pool_collection.find_one({"position": 0})
+    set_interval(current_song["durationMs"] // 1000)
+
+    # choose next song via raffle method
+    data = pool_collection.find(
+        {
+            "position": {"$eq": None},
+            "votes": {"$gt": 0},
+        }
+    )
+    entries = [
+        PoolEntry(
+            votes=d["votes"],
+            lastPlayedTimestamp=d["lastPlayedDT"],
+            poolJoinTimestamp=d["poolJoinDT"],
+        )
+        for d in data
+    ]
+    next_id = choose_next_song(entries)
+    # add next song to end of queue
+    pool_collection.find_one_and_update(
+        filter={"songId": next_id}, update={"position": max_pos}
+    )
+
+
+update_radio_queue()
+
+
 def main():
     votes = [UserVote(1, "test"), UserVote(1, "test2"), UserVote(2, "test3")]
     # print(choose_next_song(votes))
