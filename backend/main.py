@@ -81,30 +81,30 @@ N_VOTES_BIAS = 3
 TIME_SINCE_PLAYED_BIAS = 1e-3
 TIME_IN_POOL_BIAS = 1e-4
 
-def request_with_retry(mode: str, url: str, req: Request, params: dict = {}):
+def request_with_retry_using_req(mode: str, url: str, req: Request, params: dict = {}) -> Response:
     try:
         ses = get_user_session(req.cookies)
     except HTTPException:
         return RedirectResponse("/login")
-    request_with_retry(mode, url, params, ses)
+    return request_with_retry(mode, url, ses, params)
 
 
-def _do_request(mode: str, url: str, accessToken: str, params: dict = {}):
+def _do_request(mode: str, url: str, accessToken: str, params: dict = {}) -> Response:
     return requests.request(
-        mode,
+        mode.upper(),
         url,
         params=params,
-        headers={"Authorization": f"Bearer {accessToken}"},
+        headers={"Authorization": f"Bearer {accessToken}"}
     )
 
-def request_with_retry(mode: str, url: str, ses: UserSession, params: dict = {}):
-    response = _do_request(mode, url, params, ses.accessToken)
+def request_with_retry(mode: str, url: str, ses: UserSession, params: dict = {}) -> Response:
+    response = _do_request(mode, url, ses.accessToken, params)
     if response.status_code == 401:
+        print("Refreshing token")
         refresh_token(ses)
-        response = _do_request(mode, url, params, get_user_by_uri(ses.userUri).accessToken)
-    
-    if response.status_code != 200:
-        raise HTTPException(response.status_code, response.reason)
+        response = _do_request(mode, url, get_user_by_uri(ses.userUri).accessToken, params)
+    if not response.ok:
+        raise HTTPException(500, f"[{response.status_code}] {response.reason}")
     
     return response
 
@@ -347,8 +347,8 @@ def get_song_data(song_id: str, ses: UserSession):
 async def get_songs(req: Request):
     query = req.query_params.get("q")
 
-    url = "https://api.spotify.com/v1/search/"
-    response = request_with_retry("get", url, req, {
+    url = "https://api.spotify.com/v1/search"
+    response = request_with_retry_using_req("get", url, req, {
         "q": query,
         "type": "track",
         "market": "US",
@@ -461,7 +461,7 @@ def set_interval(new_int):
 def queue_song_for_user(req: Request):
     url = "https://api.spotify.com/v1/me/player/queue"
 
-    res = request_with_retry("post", url, req, {
+    res = request_with_retry_using_req("post", url, req, {
         "uri": "spotify:track:6BJHsLiE47Sk0wQkuppqhr"
     })
 
@@ -502,8 +502,9 @@ def update_radio_queue():
     
     for userURI in connected_users:
         url = "https://api.spotify.com/v1/me/player/queue"
-        res = request_with_retry("post", url, get_user_by_uri(userURI)["accessToken"], {
-            "uri": f"spotify:track:{pool_collection.find_one({"position": 2})}"
+        trackID = pool_collection.find_one({"position": 2})
+        res = request_with_retry("post", url, get_user_by_uri(userURI), {
+            "uri": f"spotify:track:{trackID}"
         })
         if res.status_code == 404:
             connected_users.remove(userURI)
