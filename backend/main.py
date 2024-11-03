@@ -273,10 +273,10 @@ def get_user_session(cookies: dict[str, str]):
     session_id = cookies.get("sessionId")
     if session_id is not None:
         ses_collection = db["sessions"]
-        result = ses_collection.find_one({"sessionId": session_id})
+        result = ses_collection.find({"sessionId": session_id}).sort("startDT", -1)
         if result is None:
             raise HTTPException(status_code=401)
-        session = UserSession.model_validate(result)
+        session = UserSession.model_validate(list(result)[0])
         if (datetime.now() - session.startDT).total_seconds() > (60 * 60):
             raise HTTPException(status_code=401)
 
@@ -422,7 +422,6 @@ def connect(req: Request):
     print(connected_users)
     
 
-# TODO: implement properly
 def refresh_token(ses: UserSession):
     request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
     encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
@@ -441,15 +440,15 @@ def refresh_token(ses: UserSession):
         raise HTTPException(status_code=400, detail="Error with refresh token")
     else:
         data = response.json()
-        updates = {
-            "accessToken": data["access_token"],
-        }
+        new_ses = ses.model_copy()
+        new_ses["accessToken"] = data["access_token"]
+        new_ses = datetime.now()
         if "refresh_token" in data:
-            updates["refreshToken"] = data["refresh_token"]
+            new_ses["refreshToken"] = data["refresh_token"]
 
         user_collection = db["sessions"]
-
-        user_collection.find_one_and_update({"userUri": ses.userUri}, update=updates)
+        user_collection.delete_many({"userUri": ses.userUri})
+        user_collection.insert_one(new_ses)
 
 
 @api.get("/request")
