@@ -17,7 +17,7 @@ function SongPlaying(props: {song: Song, className?: String}) {
         <Typography variant="caption">Now Playing</Typography>
           <Typography variant="h6">{props.song.title}</Typography>
           <Typography variant="body1">{props.song.artists.join(", ")}</Typography>
-          <Typography variant="body1">Requested by {props.song.requestCount} users</Typography>
+          <Typography variant="body1">Requested by {props.song.votes} users</Typography>
           <Box className={styles.joinButton}>
             <JoinSignInButton />
           </Box>

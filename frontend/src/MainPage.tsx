@@ -18,8 +18,8 @@ export default function MainPage() {
     artists: ["Nobody"],
     album: "No Album",
     coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
-    lengthMs: 210000,
-    requestCount: 0
+    durationMs: 210000,
+    votes: 0
   } as Song);
 
   function updateQueue() {
@@ -29,7 +29,7 @@ export default function MainPage() {
   function updateNowPlaying() {
     NetworkService.getNowPlaying().then((nowPlaying: NowPlayingSong) => {
       setCurrentSong(nowPlaying);
-      setTimeout(updateNowPlaying, nowPlaying.lengthMs - nowPlaying.position);
+      setTimeout(updateNowPlaying, nowPlaying.durationMs - nowPlaying.position);
     }).catch(() => {
       setCurrentSong({
         songId: "",
@@ -37,8 +37,8 @@ export default function MainPage() {
         artists: ["Nobody"],
         album: "No Album",
         coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
-        lengthMs: 210000,
-        requestCount: 0
+        durationMs: 210000,
+        votes: 0
       } as Song)
     })
   }
