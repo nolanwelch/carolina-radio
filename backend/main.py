@@ -8,6 +8,8 @@ from urllib.parse import urlencode
 import dotenv
 import numpy as np
 import pandas as pd
+from fastapi_restful.tasks import repeat_every
+from datetime import datetime
 import requests
 from pydantic import BaseModel
 from pymongo.mongo_client import MongoClient
@@ -53,6 +55,11 @@ class Song(BaseModel):
     album: str
     coverUrl: str
     
+class PoolEntry(BaseModel):
+    votes: int
+    spotifyUri: str
+    lastPlayedTimestamp: int
+    poolJoinTimestamp: int
 
 def get_db():
     uri = os.environ.get("MONGO_URI")
