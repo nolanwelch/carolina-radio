@@ -10,7 +10,7 @@ import dotenv
 import numpy as np
 import pandas as pd
 from fastapi_restful.tasks import repeat_every
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 from pydantic import BaseModel
 from pymongo.mongo_client import MongoClient
@@ -392,8 +392,8 @@ def now_playing(req: Request):
     if curr_song is None:
         return Response(status_code=404)
 
-    seek_time_ms = datetime.now() - curr_song["startDT"]
-    return Response(content={"song": curr_song["song"], "seekMs": seek_time_ms})
+    pos_ms = (datetime.now() - curr_song["startDT"]) / timedelta(milliseconds=1)
+    return Response(content={"song": curr_song["song"], "position": pos_ms})
 
 
 def generate_random_string(string_length):
