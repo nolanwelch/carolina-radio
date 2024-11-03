@@ -8,6 +8,9 @@ import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import Song from '../../types/Song';
+import AddIcon from '@mui/icons-material/Add';
+import { Button } from '@mui/material';
+import styles from "./QueueSong.module.css";
 
 export default function QueueSong() {
   const [value, setValue] = React.useState<Song | null>(null);
@@ -41,49 +44,57 @@ export default function QueueSong() {
   }, [value, inputValue, fetch]);
 
   return (
-    <Autocomplete
-      sx={{ width: 300 }}
-      getOptionLabel={(option) =>
-        typeof option === 'string' ? option : option.title
-      }
-      filterOptions={(x) => x}
-      options={options}
-      autoComplete
-      includeInputInList
-      filterSelectedOptions
-      value={value}
-      noOptionsText="No Matching Songs"
-      onChange={(event: any, newValue: Song | null) => {
-        setOptions(newValue ? [newValue, ...options] : options);
-        setValue(newValue);
-      }}
-      onInputChange={(event, newInputValue) => {
-        setInputValue(newInputValue);
-      }}
-      renderInput={(params) => (
-        <TextField {...params} label="Song to Queue" fullWidth />
-      )}
-      renderOption={(props, option) => {
-        const { key, ...optionProps } = props;
+    <div className={styles.queueSongContainer}>
+      <Autocomplete
+        sx={{ width: 300 }}
+        size="medium"
+        forcePopupIcon={false}
+        getOptionLabel={(option) =>
+          typeof option === 'string' ? option : option.title
+        }
+        filterOptions={(x) => x}
+        options={options}
+        autoComplete
+        filterSelectedOptions
+        value={value}
+        noOptionsText="No Matching Songs"
+        onChange={(event: any, newValue: Song | null) => {
+          setValue(newValue);
+          console.log(newValue)
+        }}
+        onInputChange={(event, newInputValue) => {
+          console.log("ic")
+          setInputValue(newInputValue);
+        }}
+        renderInput={(params) => (
+          <TextField {...params} label="Song to Queue" fullWidth />
+        )}
+        renderOption={(props, option) => {
+          console.log(props);
+          const { key, ...optionProps } = props;
 
-        return (
-          <li key={key} {...optionProps}>
-            <Grid container sx={{ alignItems: 'center' }}>
-              <Grid item sx={{ width: 'calc(100% - 44px)', wordWrap: 'break-word' }}>
-                <Box
-                    component="span"
-                    sx={{ fontWeight: 'regular' }}
-                  >
-                    {option.title}
-                  </Box>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          return (
+            <li key={key} {...optionProps}>
+              <Grid container sx={{ alignItems: 'center' }}>
+                <Grid item sx={{ width: 'calc(100% - 44px)', wordWrap: 'break-word' }}>
+                  <Box
+                      component="span"
+                      sx={{ fontWeight: 'regular' }}
+                    >
+                      {option.title}
+                    </Box>
+                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                     {option.artists.join(", ")}
-                </Typography>
+                  </Typography>
+                </Grid>
               </Grid>
-            </Grid>
-          </li>
-        );
-      }}
-    />
+            </li>
+          );
+        }}
+      />
+      <Button size="large" variant="contained" startIcon={<AddIcon />} disabled={value == undefined} onClick={() => {if (value) {NetworkService.requestSong(value)}}}>
+        Request Song
+      </Button>
+    </div>
   );
 }
