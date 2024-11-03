@@ -1,6 +1,7 @@
 export default interface Song {
+    spotifyUri: string,
     title: string;
-    artist: string;
+    artists: Array<string>;
     album: string;
     coverUrl: string;
     lengthMs: number;

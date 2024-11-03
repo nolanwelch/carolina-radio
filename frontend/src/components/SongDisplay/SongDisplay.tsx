@@ -8,10 +8,10 @@ export default function SongDisplay(props: {song: Song}) {
       <div className={styles.albumCover}><img src={props.song.coverUrl} /></div>
       <div className={styles.songInfo}>
         <Typography className={styles.songTitle}>{props.song.title}</Typography>
-        <Typography className={styles.artistName}>{props.song.artist}</Typography>
+        <Typography className={styles.artistName}>{props.song.artists.join(", ")}</Typography>
       </div>
       <Typography className={styles.songLength}>{Math.floor(props.song.lengthMs / 1000 / 60)}:{Math.floor(props.song.lengthMs / 1000 % 60)}</Typography>
-      <Typography className={styles.requestCount}>Requested by {props.song.requestCount} users</Typography>
+      {/*<Typography className={styles.requestCount}>Requested by {props.song.requestCount} users</Typography>*/}
     </Card>
   );
 }

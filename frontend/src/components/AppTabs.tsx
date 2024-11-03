@@ -12,26 +12,29 @@ interface TabPanelProps {
 
 const SAMPLE_SONGS: Song[] = [
   {
+    spotifyUri: "",
     title: "Example Song",
-    artist: "Example Artist",
+    artists: ["Example Artist"],
     album: "Example Album",
     coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
     lengthMs: 210000,
     requestCount: 15
   },
   {
-    title: "Epic Song",
-    artist: "Epic Artist",
-    album: "Epic Album",
-    coverUrl: "/album-art-tmp.png",
+    spotifyUri: "",
+    title: "Example Song",
+    artists: ["Example Artist"],
+    album: "Example Album",
+    coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
     lengthMs: 210000,
     requestCount: 15
   },
   {
-    title: "Temp Song",
-    artist: "Temp Artist",
-    album: "Temp Album",
-    coverUrl: "/album-art-tmp.png",
+    spotifyUri: "",
+    title: "Example Song",
+    artists: ["Example Artist"],
+    album: "Example Album",
+    coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
     lengthMs: 210000,
     requestCount: 15
   }

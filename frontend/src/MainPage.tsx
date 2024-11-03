@@ -35,8 +35,9 @@ export default function MainPage() {
       <Box sx={{ height: "100vh" }}>
         <Box sx={{ height: "300px", paddingTop: "30px" }}>
           <SongPlaying song={{
+            spotifyUri: "",
             title: "Example Song",
-            artist: "Example Artist",
+            artists: ["Example Artist"],
             album: "Example Album",
             coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
             lengthMs: 210000,
