@@ -473,9 +473,14 @@ def update_radio_queue():
 update_radio_queue()
 
 
-@api.route("/queue")
 def get_queue():
     pool_collection = db["songPool"]
     queue = pool_collection.find({"position": {"$gt": 0}}).sort("position", 1)
     songs = [Song.model_validate(s["song"]) for s in queue]
+    return songs
+
+
+@api.route("/queue")
+def fetch_queue():
+    songs = get_queue()
     return Response(content={"songs": songs})
