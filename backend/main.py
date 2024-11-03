@@ -393,7 +393,7 @@ def now_playing():
     pool_collection = db["songPool"]
     result = pool_collection.find_one({"position": 0})
     if result is None:
-        return HTTPException(status_code=404)
+        raise HTTPException(status_code=404)
     top_song = PoolEntry.model_validate(result)
 
     pos_ms = (datetime.now() - top_song.startDT) / timedelta(milliseconds=1)
