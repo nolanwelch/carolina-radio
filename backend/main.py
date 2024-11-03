@@ -110,7 +110,9 @@ def get_user_session(cookies: dict[str, str]):
     session_id = cookies.get("sessionId")
     if session_id is not None:
         ses_collection = db["sessions"]
-        session = UserSession(ses_collection.find_one({"sessionId": session_id}))
+        session = UserSession.model_validate(
+            ses_collection.find_one({"sessionId": session_id})
+        )
         if (datetime.now() - session.startDT).total_seconds() > (60 * 60):
             return HTTPException(status_code=401)
 
