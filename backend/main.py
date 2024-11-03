@@ -238,6 +238,18 @@ def refresh_token(request: Request):
         return response
 
 
+@api.get("/request")
+async def get_user_requests(request: Request) -> list[Song]:
+    try:
+        ses = get_user_session(request.cookies)
+    
+        pool_collection = db["requests"]
+        queue = pool_collection.find({"userUri": {"$eq": ses.userUri}}).sort("requestDT", 1)
+        songs = [Song.model_validate(s["song"]) for s in queue]
+        return songs
+    except HTTPException:
+        return RedirectResponse("/login")
+
 @api.post("/request")
 async def create_request(request: Request):
     try:

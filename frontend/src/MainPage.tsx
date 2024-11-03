@@ -14,12 +14,12 @@ export default function MainPage() {
   const [queuedSongs, setQueuedSongs] = useState<Array<Song>>([]);
   const [currentSong, setCurrentSong] = useState<Song>({
     spotifyUri: "",
-    title: "Example Song",
-    artists: ["Example Artist"],
-    album: "Example Album",
+    title: "Nothing!",
+    artists: ["Nobody"],
+    album: "No Album",
     coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
     lengthMs: 210000,
-    requestCount: 15
+    requestCount: 0
   } as Song);
 
   function updateQueue() {
@@ -30,6 +30,16 @@ export default function MainPage() {
     NetworkService.getNowPlaying().then((nowPlaying: NowPlayingSong) => {
       setCurrentSong(nowPlaying);
       setTimeout(updateNowPlaying, nowPlaying.lengthMs - nowPlaying.position);
+    }).catch(() => {
+      setCurrentSong({
+        spotifyUri: "",
+        title: "Nothing!",
+        artists: ["Nobody"],
+        album: "No Album",
+        coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
+        lengthMs: 210000,
+        requestCount: 0
+      } as Song)
     })
   }
 
