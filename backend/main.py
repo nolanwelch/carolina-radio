@@ -253,7 +253,7 @@ def create_request(request: Request):
         song = get_song_data(song_id, access_token)
         if song is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"Song {song_id} not found")
-        songs_collection.insert_one(song)
+        songs_collection.insert_one(song.model_dump())
 
     req_collection = db["requests"]
     song = Song.model_validate(songs_collection.find_one({"songId": song_id}))
