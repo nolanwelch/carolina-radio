@@ -15,7 +15,21 @@ from pymongo.server_api import ServerApi
 
 from fastapi import FastAPI, Response, Request, HTTPException, Depends, status
 from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 api = FastAPI()
+
+origins = [
+    "https://carolinaradio.tech",
+    "http://localhost:3000",
+]
+
+api.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 dotenv.load_dotenv()
 
@@ -38,7 +52,7 @@ class Song(BaseModel):
     artists: list[str]
     album: str
     coverUrl: str
-
+    
 
 def get_db():
     uri = os.environ.get("MONGO_URI")
@@ -223,6 +237,26 @@ def get_songs(req: Request):
         )
         for t in tracks
     ]
+    
+@api.put("/start_resume")
+def play_song(req: Request):
+    access_token = req.cookies.get("accessToken")
+    
+    url = "https://api.spotify.com/v1/me/player/play"
+    req = requests.put(
+        url,
+        json = {
+            "uris":["spotify:track:4iV5W9uYEdYUVa79Axb7Rh", "spotify:track:1301WleyT98MSxVHPZCA6M"],
+            "offset": {"position": 0}
+        },
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+    )
+    if req.status_code != 200:
+        raise HTTPException(req.status_code, req.reason)
+    return req
 
 async def get_current_token(request: Request):
     token = request.cookies.get("accessToken")

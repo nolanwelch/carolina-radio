@@ -1,0 +1,13 @@
+.loggedOutDisplay {
+    display: flex;
+    flex-direction: column;
+
+    justify-content: center;
+    align-items: center;
+
+    gap: 2em;
+
+    height: 100%;
+
+    padding: 2em;
+}
