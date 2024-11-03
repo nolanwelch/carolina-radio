@@ -133,10 +133,6 @@ async def update_radio_queue():
 api = FastAPI(lifespan=lifespan)
 
 
-@api.get("/fuck")
-async def fuck(_: Request):
-    test = await update_radio_queue()
-    print(test)
 
 
 origins = [
