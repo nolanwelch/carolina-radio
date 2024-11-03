@@ -490,7 +490,7 @@ def get_queue():
     return songs
 
 
-@api.route("/queue")
-def fetch_queue(_: Request):
+@api.get("/queue")
+async def fetch_queue() -> list[Song]:
     songs = get_queue()
-    return Response(content={"songs": songs})
+    return songs
