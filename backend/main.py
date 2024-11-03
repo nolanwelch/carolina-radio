@@ -388,7 +388,7 @@ def get_song_duration(song_id: str, access_token: str):
         return None
     return int(req.json()["duration_ms"])
 
-def now_playing(_: Request):
+def now_playing():
     pool_collection = db["songPool"]
     result = pool_collection.find_one({"position": 0})
     if result is None:
@@ -402,7 +402,7 @@ def now_playing(_: Request):
 @api.get("/playing")
 def get_now_playing(req: Request):
     try:
-        song, pos = now_playing(req)
+        song, pos = now_playing()
     except HTTPException:
         return Response(status_code=404)
 
