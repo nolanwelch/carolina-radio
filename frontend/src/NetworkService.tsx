@@ -12,7 +12,8 @@ const NetworkService = {
     return axios.get<Array<Song>>(process.env.REACT_APP_API_URL + "/search", {
       params: {
         query: query
-      }
+      },
+      withCredentials: true,
     }
 
     ).then((response: AxiosResponse<Song[], any>) => response.data)
