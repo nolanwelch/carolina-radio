@@ -4,6 +4,6 @@ export default interface Song {
     artists: Array<string>;
     album: string;
     coverUrl: string;
-    lengthMs: number;
-    requestCount: number;
+    durationMs: number;
+    votes: number;
 }
