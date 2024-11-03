@@ -15,7 +15,21 @@ from pymongo.server_api import ServerApi
 
 from fastapi import FastAPI, Response, Request, HTTPException, Depends, status
 from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 api = FastAPI()
+
+origins = [
+    "https://carolinaradio.tech",
+    "http://localhost:3000",
+]
+
+api.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 dotenv.load_dotenv()
 

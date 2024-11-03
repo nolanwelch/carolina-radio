@@ -10,7 +10,7 @@ export default function JoinSignInButton() {
       Join Radio
     </Button>
     :
-    <Button component={Link} href="https://api.carolinaradio.tech/login" variant="contained" startIcon={<Login />}>
+    <Button component={Link} href={process.env.REACT_APP_API_URL + "/login"} variant="contained" startIcon={<Login />}>
       Sign in to Join
     </Button>
 }
