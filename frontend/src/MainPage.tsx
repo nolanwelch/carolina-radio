@@ -6,7 +6,7 @@ import SongPlaying from './components/SongPlaying/SongPlaying';
 import { DarkMode, LightMode } from '@mui/icons-material';
 import Song from './types/Song';
 import NetworkService from './NetworkService';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import NowPlayingSong from './types/NowPlayingSong';
 import styles from "./MainPage.module.css";
 
@@ -22,6 +22,7 @@ export default function MainPage() {
     durationMs: 210000,
     votes: 0
   } as Song);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>()
 
   function updateQueue() {
     NetworkService.getQueue().then((songs: Song[]) => setQueuedSongs(songs));
@@ -31,12 +32,8 @@ export default function MainPage() {
     updateQueue()
     NetworkService.getNowPlaying().then((nowPlaying: NowPlayingSong) => {
       setCurrentSong(nowPlaying);
-      if (nowPlaying.durationMs - nowPlaying.position > 0) {
-        setTimeout(updateNowPlaying, nowPlaying.durationMs - nowPlaying.position);
-        console.log("Will update in " + (nowPlaying.durationMs - nowPlaying.position)/1000)
-      } else {
-        console.log("Something went wrong, will no longer update")
-      }
+      timeoutRef.current = setTimeout(updateNowPlaying, Math.max(500, nowPlaying.durationMs - nowPlaying.position));
+      console.log("Will update in " + Math.max(500, nowPlaying.durationMs - nowPlaying.position)/1000)
     }).catch(() => {
       setCurrentSong({
         songId: "",
@@ -52,6 +49,13 @@ export default function MainPage() {
 
   useEffect(() => {
     updateNowPlaying();
+    window.addEventListener("pageshow", () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      updateNowPlaying();
+    })
   }, [])
 
   if (!mode) {
