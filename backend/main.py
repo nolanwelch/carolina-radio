@@ -122,7 +122,7 @@ def get_user_session(cookies: dict[str, str]):
 
 
 @api.get("/login")
-def read_root():
+async def read_root():
     state = generate_random_string(20)
     scope = "user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing user-read-email"
 
@@ -143,7 +143,7 @@ def read_root():
     return response
 
 @api.get("/callback")
-def callback(request: Request, response: Response):
+async def callback(request: Request, response: Response):
 
     code = request.query_params["code"]
     state = request.query_params["state"]
@@ -239,7 +239,7 @@ def refresh_token(request: Request):
 
 
 @api.post("/request")
-def create_request(request: Request):
+async def create_request(request: Request):
     try:
         ses = get_user_session(request.cookies)
         access_token = ses.accessToken
@@ -297,7 +297,7 @@ def get_song_data(song_id: str, access_token: str):
     )
 
 @api.get("/search")
-def get_songs(req: Request):
+async def get_songs(req: Request):
     try:
         ses = get_user_session(req.cookies)
         access_token = ses.accessToken
@@ -334,7 +334,7 @@ def get_songs(req: Request):
     ]
     
 @api.put("/start_resume")
-def play_song(req: Request):
+async def play_song(req: Request):
     try:
         ses = get_user_session(req.cookies)
         access_token = ses.accessToken
@@ -358,7 +358,7 @@ def play_song(req: Request):
     return req
 
 @api.post("/spotify_queue")
-def db_to_spot_queue(req: Request):
+async def db_to_spot_queue(req: Request):
     try:
         ses = get_user_session(req.cookies)
         access_token = ses.accessToken
@@ -401,7 +401,7 @@ def now_playing():
 
 
 @api.get("/playing")
-def get_now_playing(req: Request):
+async def get_now_playing():
     try:
         song, pos = now_playing()
     except HTTPException:
