@@ -10,10 +10,10 @@ from urllib.parse import urlencode
 import dotenv
 import numpy as np
 import requests
-from fastapi import FastAPI, HTTPException, Request, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
-from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
 
 from .database import SessionLocal
 from .models import RequestStatus, Song, SongRequest, User, UserSession
@@ -636,15 +636,24 @@ def now_playing():
 
 
 @api.get("/playing")
-async def get_now_playing() -> NowPlayingSong:
-    try:
-        song, pos = now_playing()
-    except HTTPException:
-        return Response(status_code=404)
+async def get_now_playing(db: Session = Depends(get_db)) -> Song | None:
+    now_playing = db.query(SongRequest).filter(SongRequest.queue_position == 0).first()
 
-    
+    if not now_playing:
+        return None
 
-    return NowPlayingSong(songId=song.songId, artists=song.artists, album=song.album, title=song.title, coverUrl=song.coverUrl, durationMs=song.durationMs, position=pos)
+    pos_ms = (datetime.now(timezone.utc) - now_playing.time_started).total_seconds()
+    pos_ms *= 1000
+
+    song = now_playing.song
+    return {
+        "songId": song.spotify_uri,
+        "artists": [a.name for a in song.artists],
+        "album": song.album,
+        "coverUrl": song.cover_url,
+        "durationMs": song.duration_ms,
+        "position": pos_ms,
+    }
 
 
 def generate_random_string(string_length):
