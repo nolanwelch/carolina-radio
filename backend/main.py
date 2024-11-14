@@ -713,14 +713,19 @@ def get_user_by_uri(uri: str) -> UserSession:
     return UserSession.model_validate(user)
 
 
-def get_queue():
-    pool_collection = db["songPool"]
-    queue = pool_collection.find({"position": {"$gt": 0}}).sort("position", 1)
-    songs = [Song.model_validate(s["song"]) for s in queue]
+def get_queue(session: Session) -> list[Song]:
+    play_queue = (
+        session.query(SongRequest)
+        .filter(
+            SongRequest.queue_position is not None and SongRequest.queue_position > 0
+        )
+        .order_by(SongRequest.queue_position)
+    )
+    songs = [req.song for req in play_queue]
     return songs
 
 
 @api.get("/queue")
-async def fetch_queue() -> list[Song]:
-    songs = get_queue()
+async def fetch_queue(db: Session = Depends(get_db)) -> list[Song]:
+    songs = get_queue(db)
     return songs
