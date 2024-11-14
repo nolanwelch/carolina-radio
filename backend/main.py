@@ -447,7 +447,8 @@ def connect(req: Request):
     print(connected_users)
     
 
-def refresh_token(ses: UserSession):
+
+def refresh_token(ses: UserSession, db_ses: Session = Depends(get_db)):
     request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
     encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
     encoded_string = str(encoded_bytes, "utf-8")
@@ -456,7 +457,7 @@ def refresh_token(ses: UserSession):
         "Authorization": "Basic " + encoded_string,
     }
 
-    form_data = {"grant_type": "refresh_token", "refresh_token": refresh_token}
+    form_data = {"grant_type": "refresh_token", "refresh_token": ses.refresh_token}
 
     url = "https://accounts.spotify.com/api/token"
 
@@ -465,15 +466,18 @@ def refresh_token(ses: UserSession):
         raise HTTPException(status_code=400, detail="Error with refresh token")
     else:
         data = response.json()
-        new_ses = ses.model_copy()
-        new_ses["accessToken"] = data["access_token"]
-        new_ses = datetime.now()
-        if "refresh_token" in data:
-            new_ses["refreshToken"] = data["refresh_token"]
+        new_ses = UserSession(
+            user=ses.user,
+            access_token=data["access_token"],
+            refresh_token=data["refresh_token"]
+            if "refresh_token" in data
+            else ses.refresh_token,
+        )
 
-        user_collection = db["sessions"]
-        user_collection.delete_many({"userUri": ses.userUri})
-        user_collection.insert_one(new_ses)
+        # ideally, at most one user session in database
+        db_ses.query(UserSession).filter(UserSession.user == ses.user).delete()
+        db_ses.add(new_ses)
+        db_ses.commit()
 
 
 @api.get("/request")
