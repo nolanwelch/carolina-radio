@@ -15,12 +15,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from sqlalchemy import create_engine, select
 
+from .database import SessionLocal
 from .models import RequestStatus, Song, SongRequest, User, UserSession
 
 QUEUE_SIZE = 5
 
 
 last_start_time = datetime.now()
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 @asynccontextmanager
