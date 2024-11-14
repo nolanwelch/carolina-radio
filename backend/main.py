@@ -3,6 +3,7 @@ import base64
 import math
 import os
 import random
+import string
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
@@ -678,13 +679,8 @@ async def get_now_playing(db: Session = Depends(get_db)) -> Song | None:
 
 
 def generate_random_string(string_length):
-    possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-    text = "".join(
-        [
-            possible[math.floor(random.random() * len(possible))]
-            for i in range(string_length)
-        ]
-    )
+    possible = string.ascii_letters + string.digits
+    text = "".join(random.choices(possible, k=string_length))
     return text
 
 
