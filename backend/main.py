@@ -1,27 +1,21 @@
+import asyncio
 import base64
-import json
 import math
 import os
 import random
-from dataclasses import dataclass
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
-import uuid
 
 import dotenv
 import numpy as np
-import asyncio
-import pandas as pd
-from fastapi_restful.tasks import repeat_every
-from datetime import datetime, timedelta
 import requests
-from pydantic import BaseModel, Field
-from pymongo.mongo_client import MongoClient
-from pymongo.server_api import ServerApi
-
-from fastapi import FastAPI, Response, Request, HTTPException, Depends, status
-from fastapi.responses import RedirectResponse, HTMLResponse
-from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from sqlalchemy import create_engine, select
+
+from .models import RequestStatus, Song, SongRequest, User, UserSession
 
 QUEUE_SIZE = 5
 
