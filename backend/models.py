@@ -82,6 +82,9 @@ class SongRequest(Base):
     # position in the play queue; null for unqueued songs
     queue_position: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # time that song started playing; null for songs not in queue position 0
+    time_started: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
 
 class User(Base):
     __tablename__ = "user"
