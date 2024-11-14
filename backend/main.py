@@ -301,7 +301,14 @@ def get_user_session(cookies: dict[str, str]):
 @api.get("/login")
 async def read_root():
     state = generate_random_string(20)
-    scope = "user-read-private user-read-playback-state user-modify-playback-state user-read-currently-playing user-read-email"
+    scopes = [
+        "user-read-private",
+        "user-read-playback-state",
+        "user-modify-playback-state",
+        "user-read-currently-playing",
+        "user-read-email",
+    ]
+    scope = " ".join(scopes)
 
     params = {
         "response_type": "code",
