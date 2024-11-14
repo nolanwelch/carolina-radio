@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import math
 import os
 import random
 import string
@@ -9,7 +8,6 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 import dotenv
-import numpy as np
 import requests
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
