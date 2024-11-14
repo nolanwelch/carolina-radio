@@ -241,31 +241,45 @@ def request_with_retry(
 connected_users = []
 
 
-def get_ticket_count(n_votes, time_since_played_s, time_in_pool_s):
-    return (
-        N_VOTES_BIAS * n_votes
-        + TIME_SINCE_PLAYED_BIAS * time_since_played_s
-        + TIME_IN_POOL_BIAS * time_in_pool_s
+def choose_next_song(session: Session) -> SongRequest | None:
+    song_requests = session.query(SongRequest).filter(
+        SongRequest.status == RequestStatus.REQUESTED
     )
 
+    if not song_requests:
+        return None
 
-def choose_next_song(entries: PoolEntry):
-    curr_time = datetime.now()
-    entry_tickets = []
-    for entry in entries:
-        last_played = entry.lastPlayedDT or curr_time
-        time_since_played = (curr_time - last_played).total_seconds()
-        entered_pool = entry.poolJoinDT or curr_time
-        time_since_entry = (curr_time - entered_pool).total_seconds()
-        entry_tickets.append(
-            get_ticket_count(entry.votes, time_since_played, time_since_entry)
+    weighted_songs = []
+    current_dt = datetime.now(timezone.utc)
+
+    for req in song_requests:
+        song = req.song
+
+        votes = song.vote_count
+        time_since_played = (
+            (current_dt - song.last_played).total_seconds()
+            if song.last_played
+            else float("inf")
         )
-    total_tickets = sum([e for e in entry_tickets])
-    probs = [t / total_tickets for t in entry_tickets]
-    ids = [e.song.songId for e in entries]
-    print(ids, probs)
-    song_uri = np.random.choice(ids, 1, p=probs)[0]
-    return str(song_uri)
+        time_in_pool = (current_dt - req.time_created).total_seconds()
+
+        weight = (
+            votes * N_VOTES_BIAS
+            + time_since_played * TIME_SINCE_PLAYED_BIAS
+            + time_in_pool * TIME_IN_POOL_BIAS
+        )
+        weighted_songs.append((req, weight))
+
+    total_weight = sum(weight for _, weight in weighted_songs)
+    choice = random.uniform(0, total_weight)
+
+    cumulative_weight = 0
+    for req, weight in weighted_songs:
+        cumulative_weight += weight
+        if cumulative_weight >= choice:
+            return req
+
+    return None
 
 
 def get_user_session(cookies: dict[str, str]):
