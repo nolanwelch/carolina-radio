@@ -475,7 +475,7 @@ def refresh_token(ses: UserSession, db_ses: Session = Depends(get_db)):
         )
 
         # ideally, at most one user session in database
-        db_ses.query(UserSession).filter(UserSession.user == ses.user).delete()
+        db_ses.query(UserSession).filter(UserSession.user_id == ses.user_id).delete()
         db_ses.add(new_ses)
         db_ses.commit()
 
