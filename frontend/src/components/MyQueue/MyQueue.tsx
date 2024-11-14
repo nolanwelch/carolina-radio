@@ -8,7 +8,11 @@ import { useEffect, useState } from "react";
 import SongDisplay from "../SongDisplay/SongDisplay";
 
 export default function MyQueue() {
-  const isSignedIn: boolean = NetworkService.isLoggedIn();
+  const [isSignedIn, setIsSignedIn] = useState(false);
+
+  useEffect(() => {
+    NetworkService.isLoggedIn().then((value: boolean) => setIsSignedIn(value));
+  }, [])
   const [requestedSongs, setRequestedSongs] = useState<Array<Song>>([]);
 
   useEffect(()=> {

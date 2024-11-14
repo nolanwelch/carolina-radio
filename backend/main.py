@@ -532,6 +532,14 @@ def get_song_data(song_id: str, ses: UserSession):
     )
 
 
+@api.get("/is_authenticated")
+async def get_is_authenticated(req: Request):
+    try:
+        get_user_session(req.cookies)
+        return True
+    except HTTPException:
+        return False
+
 @api.get("/search")
 async def get_songs(req: Request):
     query = req.query_params.get("q")
