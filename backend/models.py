@@ -29,6 +29,7 @@ class Song(Base):
     __tablename__ = "song"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    spotify_uri: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     title: Mapped[str] = mapped_column(String, nullable=False)
     album: Mapped[str | None] = mapped_column(String, nullable=True)
     cover_url: Mapped[str | None] = mapped_column(String, nullable=True)
