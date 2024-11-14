@@ -281,18 +281,24 @@ def choose_next_song(session: Session) -> SongRequest | None:
     return None
 
 
-def get_user_session(cookies: dict[str, str]):
+def get_user_session(session: Session, cookies: dict[str, str]):
     session_id = cookies.get("sessionId")
     if session_id is not None:
-        ses_collection = db["sessions"]
-        result = ses_collection.find({"sessionId": session_id}).sort("startDT", -1)
-        if result is None:
-            raise HTTPException(status_code=401)
-        session = UserSession.model_validate(list(result)[0])
-        if (datetime.now() - session.startDT).total_seconds() > (60 * 60):
+        user_session = (
+            session.query(UserSession)
+            .filter(UserSession.session_id == session_id)
+            .order_by(UserSession.start_time.desc())
+            .first()
+        )
+
+        if user_session is None:
             raise HTTPException(status_code=401)
 
-        return session
+        current_dt = datetime.now(timezone.utc)
+        if (current_dt - user_session.start_time).total_seconds() > (60 * 60):
+            raise HTTPException(status_code=401)
+
+        return user_session
 
     raise HTTPException(status_code=401)
 
