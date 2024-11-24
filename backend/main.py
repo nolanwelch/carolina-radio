@@ -655,16 +655,14 @@ async def get_songs(req: Request):
 #     return req
 
 
-def now_playing():
-    global last_start_time
-    pool_collection = db["songPool"]
-    result = pool_collection.find_one({"position": 0})
+def now_playing(db: Session = Depends(get_db)):
+    result = db.query(SongRequest).filter(SongRequest.queue_position == 0).first()
     if result is None:
         raise HTTPException(status_code=404)
-    top_song = PoolEntry.model_validate(result)
+    top_song = result.song
 
-    pos_ms = (datetime.now() - last_start_time) / timedelta(milliseconds=1)
-    return Song.model_validate(top_song.song), pos_ms
+    pos_ms = (datetime.now() - result.time_started) / timedelta(milliseconds=1)
+    return top_song, pos_ms
 
 
 @api.get("/playing")
