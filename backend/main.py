@@ -499,7 +499,7 @@ async def get_user_requests(
 
 
 @api.post("/request")
-async def create_request(request: Request):
+async def create_request(request: Request, db: Session = Depends(get_db)):
     try:
         ses = get_user_session(request.cookies)
     except HTTPException:
@@ -507,50 +507,36 @@ async def create_request(request: Request):
 
     data = await request.json()
     song_id = data.get("songId")
-    songs_collection = db["songs"]
-    song_metadata = songs_collection.find_one({"songId": song_id})
-    if not song_metadata:
+
+    song = db.query(Song).filter(Song.spotify_uri == song_id).first()
+    if song is None:  # song not in database, insert it
         song = get_song_data(song_id, ses)
         if song is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"Song {song_id} not found")
-        songs_collection.insert_one(song.model_dump())
+        db.add(song)
+        db.commit()
 
-    req_collection = db["requests"]
-    song = Song.model_validate(songs_collection.find_one({"songId": song_id}))
-    new_req = SongRequest(requestDT=datetime.now(), song=song, userUri=ses.userUri)
-    req_collection.insert_one(new_req.model_dump())
+    new_req = SongRequest(song=song, user=ses.user)
+    db.add(new_req)
+    db.commit()
 
-    pool_collection = db["songPool"]
-    with client.start_session() as session:
-        with session.start_transaction():
-            # get number of songs in queue
-            n_queued = pool_collection.count_documents({"position": {"$ne": -1}})
-            if n_queued < QUEUE_SIZE:
-                # add to queue at lowest position
-                new_entry = PoolEntry(
-                    song=song,
-                    votes=1,
-                    spotifyUri=song_id,
-                    poolJoinDT=datetime.now(),
-                    position=n_queued,  # for N queued songs, the Nth position is empty
-                )
-                pool_collection.insert_one(new_entry.model_dump())
-                return
+    # get number of songs in queue
+    n_queued = (
+        db.query(func.count(SongRequest.id))
+        .filter(SongRequest.queue_position.isnot(None))
+        .scalar()
+    )
+    queue_pos = n_queued if n_queued < QUEUE_SIZE else None
+    # add to queue at lowest position
+    new_entry = SongRequest(
+        song=song,
+        user=ses,
+        queue_position=queue_pos,  # for N queued songs, the Nth position is empty
+    )
+    db.add(new_entry)
+    db.commit()
 
-    pool_song = pool_collection.find_one({"songId": song_id})
-    if pool_song is None:
-        new_entry = PoolEntry(
-            song=song,
-            votes=1,
-            spotifyUri=song_id,
-            poolJoinDT=datetime.now(),
-            position=-1,
-        )
-        pool_collection.insert_one(new_entry.model_dump())
-    else:
-        pool_collection.find_one_and_update(
-            {"song": song}, update={"votes": {"$inc": 1}}
-        )
+    return Response(status_code=201)
 
 
 def get_song_data(song_id: str, ses: UserSession):
