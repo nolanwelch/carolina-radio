@@ -333,7 +333,7 @@ async def read_root():
 
 
 @api.get("/callback")
-async def callback(request: Request, response: Response):
+async def callback(request: Request, response: Response, db: Session = Depends(get_db)):
     code = request.query_params["code"]
     state = request.query_params["state"]
     stored_state = request.cookies.get(os.environ.get("STATE_KEY"))
@@ -384,14 +384,12 @@ async def callback(request: Request, response: Response):
             if data["explicit_content"]["filter_locked"]:
                 return response
 
-            ses_collection = db["sessions"]
             session = UserSession(
-                startDT=datetime.now(),
                 userUri=data["uri"],
                 accessToken=access_token,
                 refreshToken=refresh_token,
             )
-            ses_collection.insert_one(session.model_dump())
+            db.add(session)
 
             response.set_cookie(key="sessionId", value=session.sessionId)
 
