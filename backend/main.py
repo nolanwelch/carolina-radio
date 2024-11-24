@@ -687,28 +687,13 @@ def set_interval(new_int):
     interval_seconds = new_int
 
 
-# TODO: Delete
-@api.post("/db_to_spot_queue")
-def queue_song_for_user(req: Request):
-    url = "https://api.spotify.com/v1/me/player/queue"
-
-    res = request_with_retry_using_req(
-        "post", url, req, {"uri": "spotify:track:6BJHsLiE47Sk0wQkuppqhr"}
-    )
-
-    if res.status_code == 404:
-        pass  # TODO: Rohan, remove user from active user list at this point
-    elif res.status_code != 204:
-        raise HTTPException(req.status_code, req.reason)
-    return res
-
-
-def get_user_by_uri(uri: str) -> UserSession:
-    ses_collection = db["sessions"]
-    user = ses_collection.find_one(filter={"userUri": uri})
-    if user is None:
+def get_user_by_uri(session: Session, uri: str) -> UserSession:
+    user = session.query(User).filter(User.spotify_uri == uri).first()
+    if user is None or not user.sessions:
         raise HTTPException(404, "User not found")
-    return UserSession.model_validate(user)
+    sessions = user.sessions
+    sessions.sort(UserSession.start_time, reverse=True)
+    return sessions[0]
 
 
 def get_queue(session: Session) -> list[Song]:
