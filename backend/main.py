@@ -281,7 +281,7 @@ def choose_next_song(session: Session) -> SongRequest | None:
     return None
 
 
-def get_user_session(session: Session, cookies: dict[str, str]):
+def get_user_session(session: Session, cookies: dict[str, str]) -> UserSession:
     session_id = cookies.get("sessionId")
     if session_id is not None:
         user_session = (
