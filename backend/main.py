@@ -481,15 +481,19 @@ def refresh_token(ses: UserSession, db_ses: Session = Depends(get_db)):
 
 
 @api.get("/request")
-async def get_user_requests(request: Request) -> list[Song]:
+async def get_user_requests(
+    request: Request, db: Session = Depends(get_db)
+) -> list[Song]:
     try:
-        ses = get_user_session(request.cookies)
+        ses = get_user_session(db, request.cookies)
 
-        pool_collection = db["requests"]
-        queue = pool_collection.find({"userUri": {"$eq": ses.userUri}}).sort(
-            "requestDT", 1
+        requests = (
+            db.query(SongRequest)
+            .filter(SongRequest.user_id == ses.user_id)
+            .order_by(SongRequest.time_created)
+            .all()
         )
-        songs = [Song.model_validate(s["song"]) for s in queue]
+        songs = [req.song for req in requests]
         return songs
     except HTTPException:
         return RedirectResponse("/login")
