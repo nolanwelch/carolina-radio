@@ -545,12 +545,12 @@ def get_song_data(song_id: str, ses: UserSession):
     data = req.json()
 
     return Song(
-        songId=song_id,
-        durationMs=int(data["duration_ms"]) or -1,
+        spotify_uri="spotify://" + song_id,
+        duration_ms=int(data["duration_ms"]),
         title=data["name"],
         artists=[a["name"] for a in data["artists"]],
         album=data["album"]["name"],
-        coverUrl=data["album"]["images"][0]["url"],
+        cover_url=data["album"]["images"][0]["url"],
     )
 
 
