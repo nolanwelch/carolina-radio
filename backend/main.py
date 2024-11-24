@@ -390,6 +390,7 @@ async def callback(request: Request, response: Response, db: Session = Depends(g
                 refreshToken=refresh_token,
             )
             db.add(session)
+            db.commit()
 
             response.set_cookie(key="sessionId", value=session.sessionId)
 
