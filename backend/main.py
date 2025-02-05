@@ -92,13 +92,19 @@ async def update_radio_queue():
     )
 
     print(connected_users)
-    
+
     for userURI in connected_users:
         url = "https://api.spotify.com/v1/me/player/queue"
         print(get_user_by_uri(userURI).accessToken)
-        print(pool_collection.find_one({'position': 2}))
-        resp = request_with_retry("POST", url, get_user_by_uri(userURI), {
-                "uri": f"spotify:track:{pool_collection.find_one({'position': 2})['song']['songId']}"})
+        print(pool_collection.find_one({"position": 2}))
+        resp = request_with_retry(
+            "POST",
+            url,
+            get_user_by_uri(userURI),
+            {
+                "uri": f"spotify:track:{pool_collection.find_one({'position': 2})['song']['songId']}"
+            },
+        )
         print(resp.status_code)
 
     # get maximum position in queue
@@ -133,8 +139,6 @@ async def update_radio_queue():
 
 
 api = FastAPI(lifespan=lifespan)
-
-
 
 
 origins = [
@@ -404,20 +408,20 @@ def connect(req: Request):
         access_token = ses.accessToken
     except HTTPException:
         return RedirectResponse("/login")
-    
+
     url = "https://api.spotify.com/v1/me/player/play"
     songs = get_queue()
     currentSong, pos_ms = now_playing()
     req = requests.put(
         url,
-        json = {
+        json={
             "uris": [f"spotify:track:{currentSong.songId}"],
-            "position_ms": int(pos_ms)
+            "position_ms": int(pos_ms),
         },
         headers={
             "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
-        }
+            "Content-Type": "application/json",
+        },
     )
     if req.status_code != 204:
         raise HTTPException(req.status_code, req.reason)
@@ -444,7 +448,6 @@ def connect(req: Request):
     print(ses.userUri)
     print("------------")
     print(connected_users)
-    
 
 
 def refresh_token(ses: UserSession, db_ses: Session = Depends(get_db)):
@@ -468,9 +471,9 @@ def refresh_token(ses: UserSession, db_ses: Session = Depends(get_db)):
         new_ses = UserSession(
             user=ses.user,
             access_token=data["access_token"],
-            refresh_token=data["refresh_token"]
-            if "refresh_token" in data
-            else ses.refresh_token,
+            refresh_token=(
+                data["refresh_token"] if "refresh_token" in data else ses.refresh_token
+            ),
         )
 
         # ideally, at most one user session in database
@@ -562,6 +565,7 @@ async def get_is_authenticated(req: Request):
     except HTTPException:
         return False
 
+
 @api.get("/search")
 async def get_songs(req: Request):
     query = req.query_params.get("q")
@@ -593,7 +597,8 @@ async def get_songs(req: Request):
         )
         for t in tracks
     ]
-    
+
+
 # TODO: Delete
 # @api.put("/start_resume")
 # async def play_song(req: Request):
@@ -602,7 +607,7 @@ async def get_songs(req: Request):
 #         access_token = ses.accessToken
 #     except HTTPException:
 #         return RedirectResponse("/login")
-    
+
 #     url = "https://api.spotify.com/v1/me/player/play"
 #     songs = get_queue()
 #     currentSong, pos_ms = now_playing()
@@ -673,7 +678,7 @@ async def get_now_playing(db: Session = Depends(get_db)) -> Song | None:
     }
 
 
-def generate_random_string(string_length):
+def generate_random_string(string_length: int):
     possible = string.ascii_letters + string.digits
     text = "".join(random.choices(possible, k=string_length))
     return text
@@ -682,7 +687,7 @@ def generate_random_string(string_length):
 interval_seconds = 60
 
 
-def set_interval(new_int):
+def set_interval(new_int: int):
     global interval_seconds
     interval_seconds = new_int
 
