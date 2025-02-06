@@ -1,23 +1,30 @@
 import asyncio
 import base64
-import os
 import random
 import string
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
+import uuid
 
-import dotenv
 import requests
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from .database import SessionLocal
-from .models import RequestStatus, Song, SongRequest, User, UserSession
+from backend.entities.song_entity import SongEntity
+from backend.entities.song_request_entity import RequestStatus, SongRequestEntity
+from backend.models.song import SongModel
+from backend.models.song_request import SongRequestModel
+from fastapi.middleware.gzip import GZipMiddleware
 
-QUEUE_SIZE = 5
+from env import getenv
+
+from .database import SessionLocal
+
+QUEUE_SIZE = getenv("QUEUE_SIZE")
 
 
 last_start_time = datetime.now()
@@ -138,7 +145,20 @@ async def update_radio_queue():
     return 60
 
 
-api = FastAPI(lifespan=lifespan)
+description = """
+Welcome to the Carolina Radio RESTful Application Programming Interface.
+"""
+
+# Metadata to improve the usefulness of OpenAPI Docs /docs API Explorer
+app = FastAPI(
+    title="Carolina Radio API",
+    version="0.1.0",
+    description=description,
+    openapi_tags=[],
+)
+
+# Use GZip middleware for compressing HTML responses over the network
+app.add_middleware(GZipMiddleware)
 
 
 origins = [
@@ -146,28 +166,13 @@ origins = [
     "http://localhost:3000",
 ]
 
-api.add_middleware(
+app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-dotenv.load_dotenv()
-
-
-class Song(BaseModel):
-    songId: str
-    artists: list[str]
-    album: str
-    title: str
-    coverUrl: str
-    durationMs: int
-
-
-class NowPlayingSong(Song):
-    position: float
 
 
 class UserSession(BaseModel):
@@ -176,22 +181,6 @@ class UserSession(BaseModel):
     accessToken: str = None
     refreshToken: str = None
     sessionId: str = Field(default_factory=lambda: str(uuid.uuid4()))
-
-
-class SongRequest(BaseModel):
-    requestDT: datetime
-    song: Song
-    userUri: str
-
-
-class PoolEntry(BaseModel):
-    entryId: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    position: int = -1
-    song: Song
-    startDT: datetime = datetime.fromtimestamp(0)
-    votes: int
-    lastPlayedDT: datetime = datetime.fromtimestamp(0)
-    poolJoinDT: datetime = datetime.fromtimestamp(0)
 
 
 uri = os.environ.get("MONGO_URI")
@@ -244,9 +233,9 @@ def request_with_retry(
 connected_users = []
 
 
-def choose_next_song(session: Session) -> SongRequest | None:
-    song_requests = session.query(SongRequest).filter(
-        SongRequest.status == RequestStatus.REQUESTED
+def choose_next_song(session: Session) -> SongRequestEntity | None:
+    song_requests = session.query(SongRequestEntity).filter(
+        SongRequestEntity.status == RequestStatus.REQUESTED
     )
 
     if not song_requests:
@@ -307,151 +296,8 @@ def get_user_session(session: Session, cookies: dict[str, str]) -> UserSession:
     raise HTTPException(status_code=401)
 
 
-@api.get("/login")
-async def read_root():
-    state = generate_random_string(20)
-    scopes = [
-        "user-read-private",
-        "user-read-playback-state",
-        "user-modify-playback-state",
-        "user-read-currently-playing",
-        "user-read-email",
-    ]
-    scope = " ".join(scopes)
-
-    params = {
-        "response_type": "code",
-        "client_id": os.environ.get("CLIENT_ID"),
-        "scope": scope,
-        "redirect_uri": os.environ.get("REDIRECT_URI"),
-        "state": state,
-    }
-    response = RedirectResponse(
-        url="https://accounts.spotify.com/authorize?" + urlencode(params)
-    )
-    response.set_cookie(key=os.environ.get("STATE_KEY"), value=state)
-    response.set_cookie(
-        "sessionId",
-    )
-    return response
-
-
-@api.get("/callback")
-async def callback(request: Request, response: Response, db: Session = Depends(get_db)):
-    code = request.query_params["code"]
-    state = request.query_params["state"]
-    stored_state = request.cookies.get(os.environ.get("STATE_KEY"))
-
-    if state is None or state != stored_state:
-        raise HTTPException(status_code=400, detail="State mismatch")
-    else:
-        url = "https://accounts.spotify.com/api/token"
-        request_string = (
-            os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
-        )
-        encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
-        encoded_string = str(encoded_bytes, "utf-8")
-        headers = {
-            "content-type": "application/x-www-form-urlencoded",
-            "Authorization": "Basic " + encoded_string,
-        }
-
-        form_data = {
-            "code": code,
-            "redirect_uri": os.environ.get("REDIRECT_URI"),
-            "grant_type": "authorization_code",
-        }
-
-        api_response = requests.post(url, data=form_data, headers=headers)
-
-        if api_response.status_code == 200:
-            data = api_response.json()
-            access_token = data["access_token"]
-            refresh_token = data["refresh_token"]
-
-            url = "https://api.spotify.com/v1/me"
-            req = requests.get(
-                url,
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Content-Type": "application/json",
-                },
-            )
-            if req.status_code != 200:
-                raise HTTPException(req.status_code, req.reason)
-            data = req.json()
-            response = RedirectResponse(url=os.environ.get("URI"))
-            if data["product"] != "premium":
-                return response
-            if data["explicit_content"]["filter_enabled"]:
-                return response
-            if data["explicit_content"]["filter_locked"]:
-                return response
-
-            session = UserSession(
-                userUri=data["uri"],
-                accessToken=access_token,
-                refreshToken=refresh_token,
-            )
-            db.add(session)
-            db.commit()
-
-            response.set_cookie(key="sessionId", value=session.sessionId)
-
-        return response
-
-
-@api.put("/join")
-def connect(req: Request):
-    try:
-        ses = get_user_session(req.cookies)
-        access_token = ses.accessToken
-    except HTTPException:
-        return RedirectResponse("/login")
-
-    url = "https://api.spotify.com/v1/me/player/play"
-    songs = get_queue()
-    currentSong, pos_ms = now_playing()
-    req = requests.put(
-        url,
-        json={
-            "uris": [f"spotify:track:{currentSong.songId}"],
-            "position_ms": int(pos_ms),
-        },
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-        },
-    )
-    if req.status_code != 204:
-        raise HTTPException(req.status_code, req.reason)
-    print(songs)
-    url = "https://api.spotify.com/v1/me/player/queue"
-    req = requests.post(
-        url,
-        params={"uri": f"spotify:track:{songs[0].songId}"},
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    print("test1", req.status_code, access_token)
-    if req.status_code != 200:
-        raise HTTPException(req.status_code, req.reason)
-    req = requests.post(
-        url,
-        params={"uri": f"spotify:track:{songs[1].songId}"},
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    print("test2")
-    if req.status_code != 200:
-        raise HTTPException(req.status_code, req.reason)
-    if ses.userUri not in connected_users:
-        connected_users.append(ses.userUri)
-    print(ses.userUri)
-    print("------------")
-    print(connected_users)
-
-
 def refresh_token(ses: UserSession, db_ses: Session = Depends(get_db)):
-    request_string = os.environ.get("CLIENT_ID") + ":" + os.environ.get("CLIENT_SECRET")
+    request_string = getenv("CLIENT_ID") + ":" + getenv("CLIENT_SECRET")
     encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
     encoded_string = str(encoded_bytes, "utf-8")
     headers = {
@@ -485,14 +331,14 @@ def refresh_token(ses: UserSession, db_ses: Session = Depends(get_db)):
 @api.get("/request")
 async def get_user_requests(
     request: Request, db: Session = Depends(get_db)
-) -> list[Song]:
+) -> list[SongModel]:
     try:
         ses = get_user_session(db, request.cookies)
 
         requests = (
-            db.query(SongRequest)
-            .filter(SongRequest.user_id == ses.user_id)
-            .order_by(SongRequest.time_created)
+            db.query(SongRequestModel)
+            .filter(SongRequestModel.user_id == ses.user_id)
+            .order_by(SongRequestModel.time_created)
             .all()
         )
         songs = [req.song for req in requests]
@@ -511,7 +357,7 @@ async def create_request(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
     song_id = data.get("songId")
 
-    song = db.query(Song).filter(Song.spotify_uri == song_id).first()
+    song = db.query(SongEntity).filter(SongEntity.spotify_uri == song_id).first()
     if song is None:  # song not in database, insert it
         song = get_song_data(song_id, ses)
         if song is None:
@@ -519,19 +365,19 @@ async def create_request(request: Request, db: Session = Depends(get_db)):
         db.add(song)
         db.commit()
 
-    new_req = SongRequest(song=song, user=ses.user)
+    new_req = SongRequestEntity(song=song, user=ses.user)
     db.add(new_req)
     db.commit()
 
     # get number of songs in queue
     n_queued = (
-        db.query(func.count(SongRequest.id))
-        .filter(SongRequest.queue_position.isnot(None))
+        db.query(func.count(SongRequestEntity.id))
+        .filter(SongRequestEntity.queue_position.isnot(None))
         .scalar()
     )
     queue_pos = n_queued if n_queued < QUEUE_SIZE else None
     # add to queue at lowest position
-    new_entry = SongRequest(
+    new_entry = SongRequestEntity(
         song=song,
         user=ses,
         queue_position=queue_pos,  # for N queued songs, the Nth position is empty
@@ -547,7 +393,7 @@ def get_song_data(song_id: str, ses: UserSession):
     req = request_with_retry("get", url, ses)
     data = req.json()
 
-    return Song(
+    return SongEntity(
         spotify_uri="spotify://" + song_id,
         duration_ms=int(data["duration_ms"]),
         title=data["name"],
@@ -555,15 +401,6 @@ def get_song_data(song_id: str, ses: UserSession):
         album=data["album"]["name"],
         cover_url=data["album"]["images"][0]["url"],
     )
-
-
-@api.get("/is_authenticated")
-async def get_is_authenticated(req: Request):
-    try:
-        get_user_session(req.cookies)
-        return True
-    except HTTPException:
-        return False
 
 
 @api.get("/search")
@@ -587,7 +424,7 @@ async def get_songs(req: Request):
     tracks = response.json()["tracks"]["items"]
 
     return [
-        Song(
+        SongModel(
             songId=t["id"],
             durationMs=t["duration_ms"] if "duration_ms" in t else -1,
             title=t["name"],
@@ -599,89 +436,18 @@ async def get_songs(req: Request):
     ]
 
 
-# TODO: Delete
-# @api.put("/start_resume")
-# async def play_song(req: Request):
-#     try:
-#         ses = get_user_session(req.cookies)
-#         access_token = ses.accessToken
-#     except HTTPException:
-#         return RedirectResponse("/login")
-
-#     url = "https://api.spotify.com/v1/me/player/play"
-#     songs = get_queue()
-#     currentSong, pos_ms = now_playing()
-#     req = requests.put(
-#         url,
-#         json = {
-#             "uris": [f"spotify:track:{currentSong.songId}"] + [f"spotify:track:{s.songId}" for s in songs[:min(len(songs), 2)]],
-#             "position_ms": int(pos_ms)
-#         },
-#         headers={
-#             "Authorization": f"Bearer {access_token}",
-#             "Content-Type": "application/json"
-#         }
-#     )
-#     if req.status_code != 204:
-#         raise HTTPException(req.status_code, req.reason)
-#     return req
-
-
-# # TODO: Delete
-# @api.post("/spotify_queue")
-# async def db_to_spot_queue(req: Request):
-#     try:
-#         ses = get_user_session(req.cookies)
-#         access_token = ses.accessToken
-#     except HTTPException:
-#         return RedirectResponse("/login")
-
-#     url = "https://api.spotify.com/v1/me/player/queue"
-#     req = requests.post(
-#         url,
-#         params={"uri": "spotify:track:05JVoLLLqyHmMYrgpOOGNx"},
-#         headers={"Authorization": f"Bearer {access_token}"},
-#     )
-#     if req.status_code != 204:
-#         raise HTTPException(req.status_code, req.reason)
-#     return req
-
-
 def now_playing(db: Session = Depends(get_db)):
-    result = db.query(SongRequest).filter(SongRequest.queue_position == 0).first()
+    result = (
+        db.query(SongRequestEntity)
+        .filter(SongRequestEntity.queue_position == 0)
+        .first()
+    )
     if result is None:
         raise HTTPException(status_code=404)
     top_song = result.song
 
     pos_ms = (datetime.now() - result.time_started) / timedelta(milliseconds=1)
     return top_song, pos_ms
-
-
-@api.get("/playing")
-async def get_now_playing(db: Session = Depends(get_db)) -> Song | None:
-    now_playing = db.query(SongRequest).filter(SongRequest.queue_position == 0).first()
-
-    if not now_playing:
-        return None
-
-    pos_ms = (datetime.now(timezone.utc) - now_playing.time_started).total_seconds()
-    pos_ms *= 1000
-
-    song = now_playing.song
-    return {
-        "songId": song.spotify_uri,
-        "artists": [a.name for a in song.artists],
-        "album": song.album,
-        "coverUrl": song.cover_url,
-        "durationMs": song.duration_ms,
-        "position": pos_ms,
-    }
-
-
-def generate_random_string(string_length: int):
-    possible = string.ascii_letters + string.digits
-    text = "".join(random.choices(possible, k=string_length))
-    return text
 
 
 interval_seconds = 60
@@ -693,7 +459,7 @@ def set_interval(new_int: int):
 
 
 def get_user_by_uri(session: Session, uri: str) -> UserSession:
-    user = session.query(User).filter(User.spotify_uri == uri).first()
+    user = session.query(UserEntity).filter(UserEntity.spotify_uri == uri).first()
     if user is None or not user.sessions:
         raise HTTPException(404, "User not found")
     sessions = user.sessions
@@ -703,9 +469,10 @@ def get_user_by_uri(session: Session, uri: str) -> UserSession:
 
 def get_queue(session: Session) -> list[Song]:
     play_queue = (
-        session.query(SongRequest)
+        session.query(SongRequestEntity)
         .filter(
-            SongRequest.queue_position is not None and SongRequest.queue_position > 0
+            SongRequestEntity.queue_position is not None
+            and SongRequestEntity.queue_position > 0
         )
         .order_by(SongRequest.queue_position)
     )

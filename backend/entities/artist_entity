@@ -1,0 +1,14 @@
+from .entity_base import EntityBase
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+
+class ArtityEntity(EntityBase):
+    __tablename__ = "artist"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+
+    songs: Mapped[list["Song"]] = relationship(
+        "Song", secondary=song_artist_association, back_populates="artists"
+    )
