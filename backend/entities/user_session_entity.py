@@ -1,13 +1,14 @@
+from datetime import datetime
 from .entity_base import EntityBase
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
-class UserSessionEntity(Base):
+class UserSpotifySessionEntity(EntityBase):
     __tablename__ = "user_session"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    start_time: Mapped[datetime] = mapped_column(
+    created_time: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )
 
@@ -16,6 +17,3 @@ class UserSessionEntity(Base):
 
     access_token: Mapped[str] = mapped_column(String, nullable=False)
     refresh_token: Mapped[str] = mapped_column(String, nullable=False)
-
-    # something to give the user to identify existing sessions
-    session_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)

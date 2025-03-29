@@ -1,15 +1,20 @@
 """Exposes authentication-related operations"""
 
+import base64
+from datetime import datetime, timedelta, timezone
 import random
 import string
 from urllib.parse import urlencode
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import jwt
+import requests
 
+from backend.main import get_db
 from backend.models.user import User
 from backend.services.user import UserService
+from sqlalchemy.orm import Session
 
 from ..env import getenv
 
@@ -93,6 +98,17 @@ async def read_root():
     return response
 
 
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, _JWT_SECRET, algorithm=_JST_ALGORITHM)
+    return encoded_jwt
+
+
 @api.get("/oauth/spotify", include_in_schema=False)
 async def callback(request: Request, response: Response, db: Session = Depends(get_db)):
     code = request.query_params["code"]
@@ -143,14 +159,16 @@ async def callback(request: Request, response: Response, db: Session = Depends(g
             if data["explicit_content"]["filter_locked"]:
                 return response
 
-            session = UserSession(
+            spotify_session = UserSession(
                 userUri=data["uri"],
                 accessToken=access_token,
                 refreshToken=refresh_token,
             )
-            db.add(session)
+            db.add(spotify_session)
             db.commit()
 
-            response.set_cookie(key="sessionId", value=session.sessionId)
+            return RedirectResponse(
+                url=getenv("FRONTEND_URL") + f"/token_claim?token={create_access_token({'userID': })}"
+            )
 
         return response
