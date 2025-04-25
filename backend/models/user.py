@@ -5,5 +5,12 @@ __copyright__ = "Copyright 2025"
 __license__ = "MIT"
 
 
-class User(BaseModel):
+class UserPartial(BaseModel):
+    """Model that represents the user."""
+
+    id: int
+    spotify_uri: str
+
+
+class User(UserPartial):
     pass

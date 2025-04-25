@@ -11,6 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import jwt
 import requests
 
+from backend.entities.auth.user_entity import UserEntity
 from backend.main import get_db
 from backend.models.user import User
 from backend.services.user import UserService
@@ -58,9 +59,9 @@ def registered_user(
 
 @api.get("/is_authenticated", response_model=bool, tags=["Authentication"])
 async def get_is_authenticated(
-    token: HTTPAuthorizationCredentials | None = Depends(HTTPBearer()),
+    user: User = Depends(registered_user),
 ):
-    return token is not None
+    return user is not None
 
 
 def generate_random_string(string_length: int):
@@ -98,7 +99,7 @@ async def read_root():
     return response
 
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
+def create_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
@@ -159,16 +160,30 @@ async def callback(request: Request, response: Response, db: Session = Depends(g
             if data["explicit_content"]["filter_locked"]:
                 return response
 
-            spotify_session = UserSession(
-                userUri=data["uri"],
-                accessToken=access_token,
-                refreshToken=refresh_token,
+            # We now have an authorized user from Spotify
+
+            # If we don't have an account connected to the Spotify user, create a new user
+
+            user = (
+                db.query(UserEntity).filter(UserEntity.spotify_uri == data["uri"]).one()
             )
-            db.add(spotify_session)
+
+            if not user:
+                user = UserEntity(spotify_uri=data["uri"])
+                db.add(user)
+
+            # Update spotify auth information
+
+            user.spotify_access_token = access_token
+            user.spotify_refresh_token = refresh_token
+
             db.commit()
 
+            # Direct the user to the token claim
+
             return RedirectResponse(
-                url=getenv("FRONTEND_URL") + f"/token_claim?token={create_access_token({'userID': })}"
+                url=getenv("FRONTEND_URL")
+                + f"/token_claim?token={create_token({'userID': user.id})}"
             )
 
         return response

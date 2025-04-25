@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from .song import SongModel
+from .song import Song
 
 
 __authors__ = ["David Foss", "Gabrian Chua", "Nolan Welch", "Rohan Kashyap"]
@@ -12,5 +12,5 @@ __license__ = "MIT"
 
 class SongRequest(BaseModel):
     requestDT: datetime
-    song: SongModel
+    song: Song
     userUri: str

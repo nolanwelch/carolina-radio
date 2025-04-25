@@ -4,7 +4,7 @@ from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.entities.user_entity import UserEntity
+from backend.entities.auth.user_entity import UserEntity
 from backend.models.user import User
 
 from ..database import db_session

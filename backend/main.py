@@ -16,26 +16,17 @@ from sqlalchemy.orm import Session
 
 from backend.entities.song_entity import SongEntity
 from backend.entities.song_request_entity import RequestStatus, SongRequestEntity
-from backend.models.song import SongModel
-from backend.models.song_request import SongRequestModel
+from backend.models.pool_entry import PoolEntry
+from backend.models.song import Song
+from backend.models.song_request import SongRequest
 from fastapi.middleware.gzip import GZipMiddleware
 
 from env import getenv
-
-from .database import SessionLocal
 
 QUEUE_SIZE = getenv("QUEUE_SIZE")
 
 
 last_start_time = datetime.now()
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 @asynccontextmanager
@@ -296,160 +287,6 @@ def get_user_session(session: Session, cookies: dict[str, str]) -> UserSession:
     raise HTTPException(status_code=401)
 
 
-def refresh_token(ses: UserSession, db_ses: Session = Depends(get_db)):
-    request_string = getenv("CLIENT_ID") + ":" + getenv("CLIENT_SECRET")
-    encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
-    encoded_string = str(encoded_bytes, "utf-8")
-    headers = {
-        "content-type": "application/x-www-form-urlencoded",
-        "Authorization": "Basic " + encoded_string,
-    }
-
-    form_data = {"grant_type": "refresh_token", "refresh_token": ses.refresh_token}
-
-    url = "https://accounts.spotify.com/api/token"
-
-    response = requests.post(url, data=form_data, headers=headers)
-    if response.status_code != 200:
-        raise HTTPException(status_code=400, detail="Error with refresh token")
-    else:
-        data = response.json()
-        new_ses = UserSession(
-            user=ses.user,
-            access_token=data["access_token"],
-            refresh_token=(
-                data["refresh_token"] if "refresh_token" in data else ses.refresh_token
-            ),
-        )
-
-        # ideally, at most one user session in database
-        db_ses.query(UserSession).filter(UserSession.user_id == ses.user_id).delete()
-        db_ses.add(new_ses)
-        db_ses.commit()
-
-
-@api.get("/request")
-async def get_user_requests(
-    request: Request, db: Session = Depends(get_db)
-) -> list[SongModel]:
-    try:
-        ses = get_user_session(db, request.cookies)
-
-        requests = (
-            db.query(SongRequestModel)
-            .filter(SongRequestModel.user_id == ses.user_id)
-            .order_by(SongRequestModel.time_created)
-            .all()
-        )
-        songs = [req.song for req in requests]
-        return songs
-    except HTTPException:
-        return RedirectResponse("/login")
-
-
-@api.post("/request")
-async def create_request(request: Request, db: Session = Depends(get_db)):
-    try:
-        ses = get_user_session(request.cookies)
-    except HTTPException:
-        return RedirectResponse("/login")
-
-    data = await request.json()
-    song_id = data.get("songId")
-
-    song = db.query(SongEntity).filter(SongEntity.spotify_uri == song_id).first()
-    if song is None:  # song not in database, insert it
-        song = get_song_data(song_id, ses)
-        if song is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, f"Song {song_id} not found")
-        db.add(song)
-        db.commit()
-
-    new_req = SongRequestEntity(song=song, user=ses.user)
-    db.add(new_req)
-    db.commit()
-
-    # get number of songs in queue
-    n_queued = (
-        db.query(func.count(SongRequestEntity.id))
-        .filter(SongRequestEntity.queue_position.isnot(None))
-        .scalar()
-    )
-    queue_pos = n_queued if n_queued < QUEUE_SIZE else None
-    # add to queue at lowest position
-    new_entry = SongRequestEntity(
-        song=song,
-        user=ses,
-        queue_position=queue_pos,  # for N queued songs, the Nth position is empty
-    )
-    db.add(new_entry)
-    db.commit()
-
-    return Response(status_code=201)
-
-
-def get_song_data(song_id: str, ses: UserSession):
-    url = f"https://api.spotify.com/v1/tracks/{song_id}"
-    req = request_with_retry("get", url, ses)
-    data = req.json()
-
-    return SongEntity(
-        spotify_uri="spotify://" + song_id,
-        duration_ms=int(data["duration_ms"]),
-        title=data["name"],
-        artists=[a["name"] for a in data["artists"]],
-        album=data["album"]["name"],
-        cover_url=data["album"]["images"][0]["url"],
-    )
-
-
-@api.get("/search")
-async def get_songs(req: Request):
-    query = req.query_params.get("q")
-
-    url = "https://api.spotify.com/v1/search"
-    response = request_with_retry_using_req(
-        "get",
-        url,
-        req,
-        {
-            "q": query,
-            "type": "track",
-            "market": "US",
-        },
-    )
-
-    if response is RedirectResponse:
-        return response
-    tracks = response.json()["tracks"]["items"]
-
-    return [
-        SongModel(
-            songId=t["id"],
-            durationMs=t["duration_ms"] if "duration_ms" in t else -1,
-            title=t["name"],
-            artists=[a["name"] for a in t["artists"]],
-            album=t["album"]["name"],
-            coverUrl=t["album"]["images"][0]["url"],
-        )
-        for t in tracks
-    ]
-
-
-def now_playing(db: Session = Depends(get_db)):
-    result = (
-        db.query(SongRequestEntity)
-        .filter(SongRequestEntity.queue_position == 0)
-        .first()
-    )
-    if result is None:
-        raise HTTPException(status_code=404)
-    top_song = result.song
-
-    pos_ms = (datetime.now() - result.time_started) / timedelta(milliseconds=1)
-    return top_song, pos_ms
-
-
 interval_seconds = 60
 
 
@@ -465,22 +302,3 @@ def get_user_by_uri(session: Session, uri: str) -> UserSession:
     sessions = user.sessions
     sessions.sort(UserSession.start_time, reverse=True)
     return sessions[0]
-
-
-def get_queue(session: Session) -> list[Song]:
-    play_queue = (
-        session.query(SongRequestEntity)
-        .filter(
-            SongRequestEntity.queue_position is not None
-            and SongRequestEntity.queue_position > 0
-        )
-        .order_by(SongRequest.queue_position)
-    )
-    songs = [req.song for req in play_queue]
-    return songs
-
-
-@api.get("/queue")
-async def fetch_queue(db: Session = Depends(get_db)) -> list[Song]:
-    songs = get_queue(db)
-    return songs
