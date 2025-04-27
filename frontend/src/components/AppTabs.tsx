@@ -35,18 +35,8 @@ function AppTabs(props: {queuedSongs: Song[]}) {
 
   return (
     <>
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs variant="fullWidth" value={value} onChange={handleChange} aria-label="basic tabs example">
-          <Tab label="Next Up" />
-          <Tab label="My Queue" />
-        </Tabs>
-      </Box>
-      <TabPanel value={value} index={0}>
-        <NextUp songs={props.queuedSongs} />
-      </TabPanel>
-      <TabPanel value={value} index={1}>
-        <MyQueue />
-      </TabPanel>
+      
+      <MyQueue />
     </>
   );
 }
