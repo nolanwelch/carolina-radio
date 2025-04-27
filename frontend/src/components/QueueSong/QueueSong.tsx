@@ -88,7 +88,7 @@ export default function QueueSong(props: {addSong: (song: Song) => void}) {
                       {option.title}
                     </Box>
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    {option.artists.join(", ")}
+                    {option.artists.map(artist => artist.name).join(", ")}
                   </Typography>
                 </Grid>
               </Grid>

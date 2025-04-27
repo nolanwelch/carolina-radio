@@ -11,11 +11,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import jwt
 import requests
 
-from backend.entities.auth.user_entity import UserEntity
-from backend.main import get_db
 from backend.models.user import User
-from backend.services.user import UserService
-from sqlalchemy.orm import Session
+from backend.services.spotify import SpotifyService
 
 from ..env import getenv
 
@@ -34,34 +31,6 @@ openapi_tags = {
     "name": "Authentication",
     "description": "Authentication related operations.",
 }
-
-_JWT_SECRET = getenv("JWT_SECRET")
-_JST_ALGORITHM = "HS256"
-
-
-def registered_user(
-    user_service: UserService = Depends(),
-    token: HTTPAuthorizationCredentials | None = Depends(HTTPBearer()),
-) -> User:
-    """Returns the authenticated user or raises a 401 HTTPException if the user is not authenticated."""
-    if token:
-        try:
-            auth_info = jwt.decode(
-                token.credentials, _JWT_SECRET, algorithms=[_JST_ALGORITHM]
-            )
-            user = user_service.get(auth_info["spotify_uri"])
-            if user:
-                return user
-        except:
-            ...
-    raise HTTPException(status_code=401, detail="Unauthorized")
-
-
-@api.get("/is_authenticated", response_model=bool, tags=["Authentication"])
-async def get_is_authenticated(
-    user: User = Depends(registered_user),
-):
-    return user is not None
 
 
 def generate_random_string(string_length: int):
@@ -111,7 +80,9 @@ def create_token(data: dict, expires_delta: timedelta | None = None):
 
 
 @api.get("/oauth/spotify", include_in_schema=False)
-async def callback(request: Request, response: Response, db: Session = Depends(get_db)):
+async def callback(
+    request: Request, response: Response, spotify_srv: SpotifyService = Depends()
+):
     code = request.query_params["code"]
     state = request.query_params["state"]
     stored_state = request.cookies.get(getenv("STATE_KEY"))
@@ -160,30 +131,9 @@ async def callback(request: Request, response: Response, db: Session = Depends(g
             if data["explicit_content"]["filter_locked"]:
                 return response
 
-            # We now have an authorized user from Spotify
+            spotify_srv.set_token("access", access_token)
+            spotify_srv.set_token("refresh", refresh_token)
 
-            # If we don't have an account connected to the Spotify user, create a new user
-
-            user = (
-                db.query(UserEntity).filter(UserEntity.spotify_uri == data["uri"]).one()
-            )
-
-            if not user:
-                user = UserEntity(spotify_uri=data["uri"])
-                db.add(user)
-
-            # Update spotify auth information
-
-            user.spotify_access_token = access_token
-            user.spotify_refresh_token = refresh_token
-
-            db.commit()
-
-            # Direct the user to the token claim
-
-            return RedirectResponse(
-                url=getenv("FRONTEND_URL")
-                + f"/token_claim?token={create_token({'userID': user.id})}"
-            )
+            return
 
         return response

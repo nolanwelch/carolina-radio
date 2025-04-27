@@ -4,14 +4,10 @@ from fastapi import Depends, HTTPException
 
 from requests.adapters import HTTPAdapter, Retry
 
-from backend.database import db_session
 from sqlalchemy.orm import Session
 from requests import Session as RequestSession
-
-from backend.entities.song_entity import SongEntity
-from backend.entities.song_request_entity import SongRequestEntity
-from backend.entities.auth.user_entity import UserEntity
 from backend.env import getenv
+from backend.models.artist import Artist
 from backend.models.song import Song
 from backend.models.song_request import SongRequest
 from backend.models.user import User
@@ -26,14 +22,12 @@ class SpotifyService:
 
     def __init__(
         self,
-        session: Session = Depends(db_session),
     ):
         """Initializes a new SpotifyService.
 
         Args:
             session (Session): The database session to use, typically injected by FastAPI.
         """
-        self._session = session
 
         self._request_session = RequestSession()
 
@@ -43,12 +37,13 @@ class SpotifyService:
 
         self._request_session.mount("https://", HTTPAdapter(max_retries=retries))
 
-    def get_access_token(self, user: User) -> str:
-        user_entity = (
-            self._session.query(UserEntity).filter(UserEntity.id == user.id).one()
-        )
+    def get_token(self, type: str):
+        with open(type, "r") as token_file:
+            return token_file.readline()
 
-        return user_entity.spotify_access_token
+    def set_token(self, type: str, value: str):
+        with open(type, "w") as token_file:
+            token_file.write(value)
 
     def refresh_token(self, user: User) -> str:
         request_string = getenv("CLIENT_ID") + ":" + getenv("CLIENT_SECRET")
@@ -59,13 +54,9 @@ class SpotifyService:
             "Authorization": "Basic " + encoded_string,
         }
 
-        user_entity = (
-            self._session.query(UserEntity).filter(UserEntity.id == user.id).one()
-        )
-
         form_data = {
             "grant_type": "refresh_token",
-            "refresh_token": user_entity.spotify_refresh_token,
+            "refresh_token": self.get_token("refresh"),
         }
 
         url = "https://accounts.spotify.com/api/token"
@@ -77,25 +68,45 @@ class SpotifyService:
         else:
             data = response.json()
 
-            user_entity.spotify_access_token = data["access_token"]
+            self.set_token("access", data["access_token"])
             if "refresh_token" in data:
-                user_entity.spotify_refresh_token = data["refresh_token"]
+                self.set_token("refresh", data["refresh_token"])
 
             self._session.commit()
 
-    def get_song(self, song_id: str, user: User):
-        url = f"https://api.spotify.com/v1/tracks/{song_id}"
-
-        res = self._request_session.get(
-            url, headers={"Authorization": f"Bearer {user.spotify_access_token}"}
+    def queue_song(self, song_id: str):
+        url = "https://api.spotify.com/v1/me/player/queue"
+        res = self._request_session.post(
+            url,
+            params={"uri": f"spotify:track:{song_id}"},
+            headers={"Authorization": f"Bearer {self.get_token("access")}"},
         )
-        data = res.json()
+        print(res.status_code, res.text)
 
-        return SongEntity(
-            spotify_uri="spotify://" + song_id,
-            duration_ms=int(data["duration_ms"]),
-            title=data["name"],
-            artists=[a["name"] for a in data["artists"]],
-            album=data["album"]["name"],
-            cover_url=data["album"]["images"][0]["url"],
+    def get_song(self, query: str):
+        url = "https://api.spotify.com/v1/search"
+        response = self._request_session.get(
+            url,
+            params={
+                "q": query,
+                "type": "track",
+                "market": "US",
+            },
+            headers={"Authorization": f"Bearer {self.get_token("access")}"},
         )
+
+        tracks = response.json()["tracks"]["items"]
+
+        print(tracks[0])
+
+        return [
+            Song(
+                songId=t["id"],
+                durationMs=t["duration_ms"] if "duration_ms" in t else -1,
+                title=t["name"],
+                artists=[Artist(id=0, name=a["name"]) for a in t["artists"]],
+                album=t["album"]["name"],
+                coverUrl=t["album"]["images"][0]["url"],
+            )
+            for t in tracks
+        ]
