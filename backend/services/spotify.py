@@ -45,7 +45,7 @@ class SpotifyService:
         with open(type, "w") as token_file:
             token_file.write(value)
 
-    def refresh_token(self, user: User) -> str:
+    def refresh_token(self) -> str:
         request_string = getenv("CLIENT_ID") + ":" + getenv("CLIENT_SECRET")
         encoded_bytes = base64.b64encode(request_string.encode("utf-8"))
         encoded_string = str(encoded_bytes, "utf-8")
@@ -81,6 +81,15 @@ class SpotifyService:
             params={"uri": f"spotify:track:{song_id}"},
             headers={"Authorization": f"Bearer {self.get_token("access")}"},
         )
+
+        if res.status_code == 401:
+            self.refresh_token()
+
+            res = self._request_session.post(
+                url,
+                params={"uri": f"spotify:track:{song_id}"},
+                headers={"Authorization": f"Bearer {self.get_token("access")}"},
+            )
         print(res.status_code, res.text)
 
     def get_song(self, query: str):
@@ -94,6 +103,19 @@ class SpotifyService:
             },
             headers={"Authorization": f"Bearer {self.get_token("access")}"},
         )
+
+        if response.status_code == 401:
+            self.refresh_token()
+
+            response = self._request_session.get(
+                url,
+                params={
+                    "q": query,
+                    "type": "track",
+                    "market": "US",
+                },
+                headers={"Authorization": f"Bearer {self.get_token("access")}"},
+            )
 
         tracks = response.json()["tracks"]["items"]
 
