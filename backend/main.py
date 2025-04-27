@@ -41,6 +41,7 @@ app.add_middleware(GZipMiddleware)
 
 origins = [
     "https://carolinaradio.tech",
+    "https://radio.fossinating.com",
     "http://localhost:3000",
 ]
 
