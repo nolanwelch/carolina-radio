@@ -79,7 +79,7 @@ class SpotifyService:
         res = self._request_session.post(
             url,
             params={"uri": f"spotify:track:{song_id}"},
-            headers={"Authorization": f"Bearer {self.get_token("access")}"},
+            headers={"Authorization": f"Bearer {self.get_token('access')}"},
         )
 
         if res.status_code == 401:
@@ -88,7 +88,7 @@ class SpotifyService:
             res = self._request_session.post(
                 url,
                 params={"uri": f"spotify:track:{song_id}"},
-                headers={"Authorization": f"Bearer {self.get_token("access")}"},
+                headers={"Authorization": f"Bearer {self.get_token('access')}"},
             )
         print(res.status_code, res.text)
 
@@ -101,7 +101,7 @@ class SpotifyService:
                 "type": "track",
                 "market": "US",
             },
-            headers={"Authorization": f"Bearer {self.get_token("access")}"},
+            headers={"Authorization": f"Bearer {self.get_token('access')}"},
         )
 
         if response.status_code == 401:
@@ -114,7 +114,7 @@ class SpotifyService:
                     "type": "track",
                     "market": "US",
                 },
-                headers={"Authorization": f"Bearer {self.get_token("access")}"},
+                headers={"Authorization": f"Bearer {self.get_token('access')}"},
             )
 
         tracks = response.json()["tracks"]["items"]
