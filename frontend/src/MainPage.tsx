@@ -47,17 +47,6 @@ export default function MainPage() {
     })
   }
 
-  useEffect(() => {
-    updateNowPlaying();
-    window.addEventListener("pageshow", () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-
-      updateNowPlaying();
-    })
-  }, [])
-
   if (!mode) {
     setMode(systemMode ?? "dark")
   }; // this should never happen unless on server
@@ -84,7 +73,6 @@ export default function MainPage() {
       </Box>
       <Box sx={{ height: "100vh" }}>
         <Box sx={{ height: "300px", paddingTop: "30px" }}>
-          <SongPlaying song={currentSong} />
         </Box>
         <Box sx={{ height: `calc(100vh - 300px)` }}>
           <AppTabs queuedSongs={queuedSongs} />
