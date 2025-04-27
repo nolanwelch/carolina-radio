@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from backend.models.artist import Artist
+from ..models.artist import Artist
 
 
 __authors__ = ["David Foss", "Gabrian Chua", "Nolan Welch", "Rohan Kashyap"]

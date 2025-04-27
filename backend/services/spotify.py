@@ -6,11 +6,11 @@ from requests.adapters import HTTPAdapter, Retry
 
 from sqlalchemy.orm import Session
 from requests import Session as RequestSession
-from backend.env import getenv
-from backend.models.artist import Artist
-from backend.models.song import Song
-from backend.models.song_request import SongRequest
-from backend.models.user import User
+from ..env import getenv
+from ..models.artist import Artist
+from ..models.song import Song
+from ..models.song_request import SongRequest
+from ..models.user import User
 
 __authors__ = ["David Foss", "Rohan Kashyap", "Nolan Welch", "Gabrian Chua"]
 __copyright__ = "Copyright 2025"

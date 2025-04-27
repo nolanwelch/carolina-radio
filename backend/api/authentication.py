@@ -10,8 +10,8 @@ from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import requests
 
-from backend.models.user import User
-from backend.services.spotify import SpotifyService
+from ..models.user import User
+from ..services.spotify import SpotifyService
 
 from ..env import getenv
 

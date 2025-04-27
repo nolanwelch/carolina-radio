@@ -1,12 +1,12 @@
 from http.client import HTTPException
 
 from pydantic import BaseModel
-from backend.services.spotify import SpotifyService
+from ..services.spotify import SpotifyService
 from fastapi import APIRouter, Depends, Response, Request
 from fastapi.responses import RedirectResponse
 
-from backend.models.song import Song
-from backend.models.user import User
+from ..models.song import Song
+from ..models.user import User
 
 __authors__ = [
     "David Foss",

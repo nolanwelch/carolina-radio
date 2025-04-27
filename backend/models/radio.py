@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
-from backend.models.listener import Listener
-from backend.models.user import User
+from ..models.listener import Listener
+from ..models.user import User
 
 
 __authors__ = ["David Foss"]

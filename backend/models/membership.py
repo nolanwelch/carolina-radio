@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from backend.models.user import User
+from ..models.user import User
 
 
 __authors__ = ["David Foss"]

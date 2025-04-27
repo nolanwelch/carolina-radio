@@ -1,5 +1,5 @@
-from backend.models.listener import Listener
-from backend.models.radio import Radio
+from ..models.listener import Listener
+from ..models.radio import Radio
 
 __authors__ = ["David Foss"]
 __copyright__ = "Copyright 2025"
