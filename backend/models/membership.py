@@ -1,0 +1,15 @@
+from pydantic import BaseModel
+
+from backend.models.user import User
+
+
+__authors__ = ["David Foss"]
+__copyright__ = "Copyright 2025"
+__license__ = "MIT"
+
+
+class Membership(BaseModel):
+    id: int
+    user: User
+    radio: Radio
+    permission: int

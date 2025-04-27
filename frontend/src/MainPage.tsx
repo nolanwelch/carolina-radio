@@ -16,7 +16,7 @@ export default function MainPage() {
   const [currentSong, setCurrentSong] = useState<Song>({
     songId: "",
     title: "Nothing!",
-    artists: ["Nobody"],
+    artists: [{name: "Nobody"}],
     album: "No Album",
     coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
     durationMs: 210000,
@@ -38,7 +38,7 @@ export default function MainPage() {
       setCurrentSong({
         songId: "",
         title: "Nothing!",
-        artists: ["Nobody"],
+        artists: [{name: "Nobody"}],
         album: "No Album",
         coverUrl: "https://narcmagazine.com/wp-content/uploads/2024/10/mxmtoon.png",
         durationMs: 210000,
